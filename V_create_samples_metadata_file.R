@@ -77,4 +77,4 @@ if (setequal(headers$chip_array, samples_full_data$chip_array)){
 
 
 remove(cortex_area, disease_status, id_split, ids_mapping, ids_mapping_all, ids_mapping_c,
-       ids_mapping_f_t, samples_metadata, Voineagu_suppMat)
+       ids_mapping_f_t, samples_metadata, Voineagu_suppMat, headers)
