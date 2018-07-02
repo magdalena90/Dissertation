@@ -9,8 +9,8 @@ library(lumi)
 # Load data
 
 # Colantuoni
-raw_df_c = create_Colantuonis_raw_data_df('SR_Mean')
-gse_c = getGEO(filename='Data/Colantuoni/GSE30272_series_matrix.txt.gz', getGPL = FALSE)
+raw_df_c = create_Colantuonis_raw_data_df(cols = 'SR_Mean', colnames = 'AVG_Signal', sep = '_')
+gse_c = getGEO(filename = 'Data/Colantuoni/GSE30272_series_matrix.txt.gz', getGPL = FALSE)
 
 # Voineagu
 gse_v = lumiR('Data/Voineagu/GSE28521_non-normalized_data.txt.gz')
@@ -26,9 +26,9 @@ remove(gse_v, heebo_ilmn_maps)
 ######################################################################################################
 # PCA COLANTUONI LABELLED BY AGE
 
-# Filter dataframe
+## Filter dataframe
 # 1. IDs corresponding to genes present in ILMN dataset:
-# filtered_raw_df_c = raw_df_c[raw_df_c$HEEBO_ID %in% heebo_ilmn_map$HEEBO_ID,]
+## filtered_raw_df_c = raw_df_c[raw_df_c$HEEBO_ID %in% heebo_ilmn_map$HEEBO_ID,]
 # 2. One-to-one relation on both datasets:
 heebo_ids_unique_genes = heebo_ilmn_map$HEEBO_ID[!duplicated(heebo_ilmn_map$Gene_Symbol) & 
                                                  !duplicated(heebo_ilmn_map$Gene_Symbol, fromLast=T)]
@@ -51,10 +51,10 @@ remove(heebo_ids_unique_genes, new_colnames, sample_info, pca)
 ######################################################################################################
 # PCA VOINEAGU LABELLED BY BRAIN REGION
 
-# Filter dataframe
-# 1. IDs corresponding to genes present in ILMN dataset:
+## Filter dataframe
+## 1. IDs corresponding to genes present in ILMN dataset:
 # filtered_raw_df_v = raw_df_v[rownames(raw_df_v) %in% heebo_ilmn_map$ILMN_ID,]
-# 2. One-to-one relation on both datasets:
+## 2. One-to-one relation on both datasets:
 ilmn_ids_unique_genes = heebo_ilmn_map$ILMN_ID[!duplicated(heebo_ilmn_map$Gene_Symbol) & 
                                                  !duplicated(heebo_ilmn_map$Gene_Symbol, fromLast=T)]
 filtered_raw_df_v = raw_df_v[rownames(raw_df_v) %in% ilmn_ids_unique_genes,]
@@ -92,10 +92,11 @@ pca = perform_pca(filtered_raw_df_v_br, sample_info, paste0('Voineagu raw data f
 ######################################################################################################
 # PCA COLANTUONI VS VOINEAGU
 
-# Filter autism samples from Voineagu
-filtered_raw_df_v = cbind(filtered_raw_df_v_br[,1],filtered_raw_df_v_br[,colnames(filtered_raw_df_v_br)
-                          %in% sample_info_v$GSM[sample_info_v$Disease.status=='control']])
-colnames(filtered_raw_df_v)[1] = 'ILMN_ID'
+## Filter autism samples from Voineagu
+# filtered_raw_df_v = cbind(filtered_raw_df_v_br[,1],filtered_raw_df_v_br[,colnames(filtered_raw_df_v_br)
+#                           %in% sample_info_v$GSM[sample_info_v$Disease.status=='control']])
+# colnames(filtered_raw_df_v)[1] = 'ILMN_ID'
+filtered_raw_df_v = filtered_raw_df_v_br
 
 # Combine dataframes
 heebo_gene = merge(filtered_raw_df_c, unique(heebo_ilmn_map[,c('Gene_Symbol','HEEBO_ID')]), 
@@ -112,6 +113,11 @@ sample_info = data.frame('ID'=colnames(heebo_gene_ilmn), 'source'='Colantuoni')
 sample_info$ID = as.character(sample_info$ID)
 sample_info$source = as.character(sample_info$source)
 sample_info = sample_info[-1,]
-sample_info$source[sample_info$ID %in% colnames(filtered_raw_df_v)] = 'Voineagu'
+## Voineagu all together
+# sample_info$source[sample_info$ID %in% colnames(filtered_raw_df_v)] = 'Voineagu'
+# Voineagu separated by control and autism
+sample_info$source[sample_info$ID %in% colnames(filtered_raw_df_v)] = 'Voineagu_ctrl'
+sample_info$source[sample_info$ID %in% sample_info_v$GSM[sample_info_v$Disease.status=='control']] = 
+  'Voineagu_autism'
 
 pca = perform_pca(heebo_gene_ilmn, sample_info, 'Voineagu vs. Colantuoni raw data')
