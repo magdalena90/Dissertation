@@ -131,21 +131,23 @@ perform_pca = function(df, labels, title){
   
   # Transpose and set colnames of dataframe
   pca_data = data.frame(t(df))
-  colnames(pca_data) = as.character(unlist(pca_data[1,]))
-  pca_data = pca_data[-1,]
   pca_data[] = lapply(lapply(pca_data, as.character), as.numeric)
   pca_data = log(pca_data+1)
-  pca_data = pca_data[!duplicated(pca_data),]
+  pca_data = pca_data[!duplicated(pca_data),]   # Check
   
   # Merge with labels df
   pca_data$ID = rownames(pca_data)
   pca_data = merge(pca_data, labels, by='ID')
+  if(colnames(labels[2])=='age_group'){
+    ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
+    pca_data = transform(pca_data, age_group=factor(age_group, levels = ordered_levels))
+  }
   
   # Perform pca and plot
   pca_data_vals = pca_data[,!names(pca_data) %in% colnames(labels)]
   pca = prcomp(pca_data_vals, center = TRUE, scale. = TRUE)
-  print(autoplot(pca, data = pca_data, colour = colnames(labels)[2], alpha = 0.7) + theme_minimal() + 
-          ggtitle(title) + theme(plot.title = element_text(hjust = 0.5)))
+  print(autoplot(pca, data = pca_data, colour = colnames(labels)[2], alpha = 0.7) + 
+        theme_minimal() + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5)))
   
   return(pca)
 }
