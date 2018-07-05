@@ -124,7 +124,7 @@ create_Voineagus_pData_df = function(){
   return(samples_full_data)
 }
 
-perform_pca = function(df, labels, title){
+perform_pca = function(df, labels, title, use_log = FALSE){
   # Input: - df:     Dataframe with probes as rows and samples as columns. Needs an ID column
   #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
   # Output: pca object and plot of 2 principal components coloured by label
@@ -132,7 +132,7 @@ perform_pca = function(df, labels, title){
   # Transpose and set colnames of dataframe
   pca_data = data.frame(t(df))
   pca_data[] = lapply(lapply(pca_data, as.character), as.numeric)
-  pca_data = log(pca_data+1)
+  if(use_log) pca_data = log(pca_data+1)
   pca_data = pca_data[!duplicated(pca_data),]   # Check
   
   # Merge with labels df
