@@ -124,16 +124,36 @@ create_Voineagus_pData_df = function(){
   return(samples_full_data)
 }
 
+prepare_pca_c_vs_v = function(exprs_c, exprs_v, pData_c, pData_v, title, by='Source'){
+  exprs_c_v = merge(exprs_c, exprs_v, by='row.names')
+  rownames(exprs_c_v) = exprs_c_v$Row.names
+  exprs_c_v$Row.names = NULL
+  if(by == 'Source'){
+    labels = rbind(data.frame('ID' = rownames(pData_c), 'Source' = 'Colantuoni'),
+                   data.frame('ID' = rownames(pData_v), 'Source' = 'Voineagu'))
+  } else {
+    labels = rbind(data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group),
+                   data.frame('ID' = rownames(pData_v), 'age_group' = pData_v$age_group))
+  }
+  pca = perform_pca(exprs_c_v, labels, title)
+  
+  return(pca)
+}
+
 perform_pca = function(df, labels, title, use_log = FALSE){
   # Input: - df:     Dataframe with probes as rows and samples as columns. Needs an ID column
   #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
   # Output: pca object and plot of 2 principal components coloured by label
   
+  # Remove rows with NAs
+  df = na.omit(df)
+  labels = labels[labels$ID %in% colnames(df),]
+  
   # Transpose and set colnames of dataframe
   pca_data = data.frame(t(df))
   pca_data[] = lapply(lapply(pca_data, as.character), as.numeric)
   if(use_log) pca_data = log(pca_data+1)
-  pca_data = pca_data[!duplicated(pca_data),]   # Check
+  pca_data = pca_data[!duplicated(pca_data),]   # Check, shouldn't be any
   
   # Merge with labels df
   pca_data$ID = rownames(pca_data)
