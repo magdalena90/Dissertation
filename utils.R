@@ -62,14 +62,14 @@ create_Voineagus_pData_df = function(){
   # Output: Dataframe with pData of Voineagu's raw data
  
   # BrainBank, chip_array
-  Voineagu_suppMat = read.csv('Data/Voineagu/aux/Voineagu_suppMat.csv')
+  Voineagu_suppMat = read.csv('Data/Voineagu/aux/supplementary_table_2.csv')
   Voineagu_suppMat$chip_array = paste(Voineagu_suppMat$Chip, Voineagu_suppMat$Array, sep='_')
   Voineagu_suppMat = Voineagu_suppMat[,c('Brain.Bank.Case.Id','Cortex.area','Disease.status',
                                          'chip_array')]
   Voineagu_suppMat$Cortex.area = as.character(Voineagu_suppMat$Cortex.area)
   
   # MATCH ALL FRONTAL + TEMPORAL IDS:
-  # GSM, BrainBank
+  # GSM, BrainBank (relation obtained from the series matrix phenotype information)
   ids_mapping = read.delim('Data/Voineagu/aux/ids_mapping.txt', header=FALSE)
   colnames(ids_mapping)[1:2] = c('GSM','Brain.Bank.Plus')
   id_split = strsplit(as.character(ids_mapping$Brain.Bank.Plus),'_')
@@ -86,7 +86,7 @@ create_Voineagus_pData_df = function(){
     disease_status[ids_mapping$Disease.status[ids_mapping$Disease.status %in% names(disease_status)]]
   
   # BrainBank, metadata
-  samples_metadata = read.delim2('Data/Voineagu/aux/samples_metadata.tsv')
+  samples_metadata = read.delim2('Data/Voineagu/aux/supplementary_table_1.tsv')
   
   # Frontal and temporal info:
   ids_mapping_f_t = merge(Voineagu_suppMat, ids_mapping, 
@@ -140,28 +140,49 @@ prepare_pca_c_vs_v = function(exprs_c, exprs_v, pData_c, pData_v, title, by='Sou
   return(pca)
 }
 
-perform_pca = function(df, labels, title, use_log = FALSE){
-  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs an ID column
+prepare_visualisation_data = function(df, labels, vis='PCA'){
+  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
   #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
-  # Output: pca object and plot of 2 principal components coloured by label
+  #        - vis:    Visualisation (PCA, MDS)
+  # Output: data ready for visualisation analysis
   
   # Remove rows with NAs
   df = na.omit(df)
   labels = labels[labels$ID %in% colnames(df),]
   
-  # Transpose and set colnames of dataframe
-  pca_data = data.frame(t(df))
-  pca_data[] = lapply(lapply(pca_data, as.character), as.numeric)
-  if(use_log) pca_data = log(pca_data+1)
-  pca_data = pca_data[!duplicated(pca_data),]   # Check, shouldn't be any
+  # Visualisation specific transformations
+  if(vis=='PCA'){
+    vis_data = data.frame(t(df))
+    vis_data[] = lapply(lapply(vis_data, as.character), as.numeric)
+  } else {
+    pearson_cor = cor(exprs_c, method = 'pearson')
+    distance_mat = 1 - pearson_cor
+    rownames(distance_mat) = colnames(distance_mat)
+    mds = cmdscale(distance_mat, k = 2, eig = TRUE)
+    
+    vis_data = data.frame(mds$points)
+    rownames(vis_data) = rownames(distance_mat)
+  }
   
-  # Merge with labels df
-  pca_data$ID = rownames(pca_data)
-  pca_data = merge(pca_data, labels, by='ID')
+  # Merge vis_data with labels
+  vis_data$ID = rownames(vis_data)
+  vis_data = merge(vis_data, labels, by='ID')
+  vis_data$ID = NULL
   if(colnames(labels[2])=='age_group'){
     ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
-    pca_data = transform(pca_data, age_group=factor(age_group, levels = ordered_levels))
+    vis_data = transform(vis_data, age_group=factor(age_group, levels = ordered_levels))
   }
+  
+  return(vis_data)
+}
+
+perform_pca = function(df, labels, title){
+  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
+  #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
+  # Output: pca object and plot of 2 principal components coloured by label
+  
+  # Prepare data
+  pca_data = prepare_visualisation_data(df, labels, vis='PCA')
   
   # Perform pca and plot
   pca_data_vals = pca_data[,!names(pca_data) %in% colnames(labels)]
@@ -170,4 +191,20 @@ perform_pca = function(df, labels, title, use_log = FALSE){
         theme_minimal() + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5)))
   
   return(pca)
+}
+
+perform_mds = function(df, labels, title){
+  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
+  #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
+  # Output: mds object and 2D plot coloured by label
+  
+  # Prepare data
+  mds_data = prepare_visualisation_data(df, labels, vis = 'MDS')
+
+  # Plot MDS
+  print(ggplot(mds_data, aes(x=X1, y=X2, colour=get(colnames(labels)[2]))) + geom_point() + 
+        theme_minimal() + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5)) +
+        labs(colour = colnames(labels)[2]))
+  
+  return(mds_data)
 }
