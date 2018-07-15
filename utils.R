@@ -5,6 +5,9 @@ library(illuminaHumanv4.db)
 library(tibble)
 library(data.table)
 library(ggfortify)
+library(MASS)        # LDA
+library(plsgenomics) # PLS.LDA
+library(caret)
 
 map_HEEBO_ILMN_ids = function(){
   # Output: Dataframe with all the genes present in both datasets with their corresponding ids
@@ -124,6 +127,46 @@ create_Voineagus_pData_df = function(){
   return(samples_full_data)
 }
 
+prepare_visualisation_data = function(df, labels, vis='PCA'){
+  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
+  #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
+  #        - vis:    Visualisation (PCA, MDS)
+  # Output: data ready for visualisation analysis
+  
+  # Remove rows with NAs
+  df = na.omit(df)
+  labels = labels[labels$ID %in% colnames(df),]
+  
+  # Visualisation specific transformations
+  if(vis=='MDS'){
+    pearson_cor = cor(exprs_c, method = 'pearson')
+    distance_mat = 1 - pearson_cor
+    rownames(distance_mat) = colnames(distance_mat)
+    mds = cmdscale(distance_mat, k = 2, eig = TRUE)
+    
+    vis_data = data.frame(mds$points)
+    rownames(vis_data) = rownames(distance_mat)
+  } else {
+    vis_data = data.frame(t(df))
+    vis_data[] = lapply(lapply(vis_data, as.character), as.numeric)
+  }
+  
+  # BoxCox, center and rescale data
+  trans = preProcess(vis_data, c('BoxCox', 'center', 'scale'))
+  vis_data = data.frame(predict(trans, vis_data))
+  
+  # Merge vis_data with labels
+  vis_data$ID = rownames(vis_data)
+  vis_data = merge(vis_data, labels, by='ID')
+  vis_data$ID = NULL
+  if(colnames(labels[2])=='age_group'){
+    ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
+    vis_data = transform(vis_data, age_group=factor(age_group, levels = ordered_levels))
+  }
+  
+  return(vis_data)
+}
+
 prepare_pca_c_vs_v = function(exprs_c, exprs_v, pData_c, pData_v, title, by='Source'){
   exprs_c_v = merge(exprs_c, exprs_v, by='row.names')
   rownames(exprs_c_v) = exprs_c_v$Row.names
@@ -138,42 +181,6 @@ prepare_pca_c_vs_v = function(exprs_c, exprs_v, pData_c, pData_v, title, by='Sou
   pca = perform_pca(exprs_c_v, labels, title)
   
   return(pca)
-}
-
-prepare_visualisation_data = function(df, labels, vis='PCA'){
-  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
-  #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
-  #        - vis:    Visualisation (PCA, MDS)
-  # Output: data ready for visualisation analysis
-  
-  # Remove rows with NAs
-  df = na.omit(df)
-  labels = labels[labels$ID %in% colnames(df),]
-  
-  # Visualisation specific transformations
-  if(vis=='PCA'){
-    vis_data = data.frame(t(df))
-    vis_data[] = lapply(lapply(vis_data, as.character), as.numeric)
-  } else {
-    pearson_cor = cor(exprs_c, method = 'pearson')
-    distance_mat = 1 - pearson_cor
-    rownames(distance_mat) = colnames(distance_mat)
-    mds = cmdscale(distance_mat, k = 2, eig = TRUE)
-    
-    vis_data = data.frame(mds$points)
-    rownames(vis_data) = rownames(distance_mat)
-  }
-  
-  # Merge vis_data with labels
-  vis_data$ID = rownames(vis_data)
-  vis_data = merge(vis_data, labels, by='ID')
-  vis_data$ID = NULL
-  if(colnames(labels[2])=='age_group'){
-    ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
-    vis_data = transform(vis_data, age_group=factor(age_group, levels = ordered_levels))
-  }
-  
-  return(vis_data)
 }
 
 perform_pca = function(df, labels, title){
@@ -208,3 +215,76 @@ perform_mds = function(df, labels, title){
   
   return(mds_data)
 }
+
+perform_lda = function(df, labels, title, pls=FALSE){
+  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
+  #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
+  # Output: lda object and 2D plot coloured by label
+  
+  # Prepare data
+  lda_data = prepare_visualisation_data(df, labels, vis = 'LDA')
+  
+  # Perform LDA
+  if(pls){
+    pls_fit = pls.lda(lda_data[,-ncol(lda_data)], lda_data[,ncol(lda_data)], ncom=1:4, nruncv=10)
+    lda_fit = pls_fit$lda.out
+    lda_points = as.matrix(lda_data[,-ncol(lda_data)]) %*% pls_fit$pls.out$R %*% lda_fit$scaling
+  } else {
+    lda_fit = lda(age_group ~ ., data = lda_data)
+    lda_points = as.matrix(lda_data[,-ncol(lda_data)]) %*% lda_fit$scaling 
+  }
+  lda_points = data.frame(cbind(lda_points[,1:2], as.character(pData$age_group)))
+  colnames(lda_points) = c('LD1','LD2',colnames(labels)[2])
+  
+  if(colnames(labels[2])=='age_group'){
+    ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
+    lda_points = transform(lda_points, age_group=factor(age_group, levels = ordered_levels))
+  }
+  
+  # Plot LDA
+  xlab = paste0('LD1 (', round(100*lda_fit$svd[1]^2/sum(lda_fit$svd^2),1),'%)') # between group var
+  ylab = paste0('LD2 (', round(100*lda_fit$svd[2]^2/sum(lda_fit$svd^2),1),'%)')
+  
+  print(ggplot(lda_points, aes(x=LD1, y=LD2, colour=get(colnames(labels)[2]))) + geom_point() + 
+          ggtitle(title) + labs(colour = colnames(labels)[2]) + xlab(xlab) + ylab(ylab) +
+          theme(plot.title = element_text(hjust = 0.5), axis.text.x=element_blank(), 
+                axis.ticks.x=element_blank(), axis.text.y=element_blank(), 
+                axis.ticks.y=element_blank()))
+  
+  return(lda_fit)
+}
+
+perform_tsne = function(df, labels, perplexity, title){
+  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
+  #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
+  # Output: data frame with x,y coordinates and 2D plot
+  
+  # Prepare data
+  tsne_data = prepare_visualisation_data(df, labels, vis='TSNE')
+  
+  # Perform tsne and plot
+  tsne_data_vals = tsne_data[,!names(tsne_data) %in% colnames(labels)]
+  ptm <- proc.time()
+  tsne_points = tsne(tsne_data_vals, perplexity = perplexity)
+  (proc.time() - ptm)/60
+  
+  tsne_points = data.frame(cbind(tsne_points, as.character(tsne_data[,ncol(tsne_data)])))
+  
+  colnames(tsne_points) = c('x','y',colnames(labels)[2])
+  
+  if(colnames(labels[2])=='age_group'){
+    ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
+    tsne_points = transform(tsne_points, age_group=factor(age_group, levels = ordered_levels))
+  }
+  
+  print(ggplot(tsne_points, aes(x=x, y=y, colour=get(colnames(labels)[2]))) + geom_point() + 
+          ggtitle(title) +  labs(colour = colnames(labels)[2]) +
+          theme(plot.title = element_text(hjust = 0.5), axis.title.x=element_blank(),
+                axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.title.y=element_blank(),
+                axis.text.y=element_blank(), axis.ticks.y=element_blank()) + theme_minimal())
+  
+  return(tsne_points)  
+}
+
+
+
