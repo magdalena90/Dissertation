@@ -8,6 +8,7 @@ library(ggfortify)
 library(MASS)        # LDA
 library(plsgenomics) # PLS.LDA
 library(caret)
+library(samr)
 
 map_HEEBO_ILMN_ids = function(){
   # Output: Dataframe with all the genes present in both datasets with their corresponding ids
@@ -286,5 +287,32 @@ perform_tsne = function(df, labels, perplexity, title){
   return(tsne_points)  
 }
 
+identify_significant_genes = function(exprs, labels, source, fdr = 0.05){
+  if(source == 'Colantuoni'){
+    obj.var = 'age_group'
+    resp.type = 'Multiclass'
+    sex_col = '`Sex:ch1`'
+  } else {
+    obj.var = 'Disease.status'
+    resp.type = 'Two class unpaired'
+    sex_col = 'SEX'
+  }
+  
+  # Perform SAM and extract significant genes
+  SAM_fit = SAM(exprs, as.factor(labels[[obj.var]]), resp.type=resp.type, 
+                geneid=rownames(exprs), random.seed=1234, logged2=TRUE, fdr.output=fdr)
+  signif_genes = data.frame(SAM_fit$siggenes.table$genes.up)
+  signif_genes = signif_genes[as.numeric(as.character(signif_genes$Fold.Change))>1.3,]
+  
+  # Detect significant genes for gender identification and remove them from list
+  SAM_fit_sex = SAM(exprs, as.factor(pData_v[[sex_col]]), resp.type=resp.type, 
+                    geneid=rownames(exprs), random.seed=1234, logged2=TRUE, fdr.output=fdr)
+  signif_genes_sex = data.frame(SAM_fit_sex$siggenes.table$genes.up)
+  signif_genes_sex = signif_genes_sex[as.numeric(as.character(signif_genes_sex$Fold.Change))>1.3,]
+  
+  signif_genes = signif_genes[!signif_genes$Gene.Name %in% signif_genes_sex$Gene.Name,]
+  
+  return(signif_genes)
+}
 
 
