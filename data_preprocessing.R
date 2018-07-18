@@ -3,23 +3,24 @@ setwd('~/MSc/Dissertation')
 source('utils.R')
 
 library(sva)
+library(WGCNA)
 
-plot_pca = TRUE
+plot_pca = FALSE
 ######################################################################################################
 # LOAD DATA
 
-load('Data/LumiBatch_Colantuoni.RData')
+load('Data/LumiBatch_Colantuoni_big.RData')
 exprs_c = exprs(LumiBatch_c)
 pData_c = pData(LumiBatch_c)
 
-load('Data/LumiBatch_Voineagu.RData')
+load('Data/LumiBatch_Voineagu_big.RData')
 exprs_v = exprs(LumiBatch_v)
 pData_v = pData(LumiBatch_v)
 
-# keep only 32 frontal cortex samples
-LumiBatch_v = LumiBatch_v[,colnames(LumiBatch_v) %in% pData_v$GSM[pData_v$Cortex.area!='cerebellum']]
-pData(LumiBatch_v) = pData_v[pData_v$Cortex.area != 'cerebellum',]
-exprs_v = exprs(LumiBatch_v)
+# # keep only 32 frontal cortex samples
+# LumiBatch_v = LumiBatch_v[,colnames(LumiBatch_v) %in% pData_v$GSM[pData_v$Cortex.area!='cerebellum']]
+# pData(LumiBatch_v) = pData_v[pData_v$Cortex.area != 'cerebellum',]
+# exprs_v = exprs(LumiBatch_v)
 
 ######################################################################################################
 # PCA Check:
@@ -32,34 +33,34 @@ if(plot_pca){
 ######################################################################################################
 # FILTER PROBES (rows)
 
-# 1 Drop low intensity values and filter probes with <0.5 fetal or postnatal data
-exprs_c[exprs_c<39.4] = NA
-detect_high_NA_perc = function(exprs, pData, perc=0.5){
-  class_name = colnames(pData)[2]
-  classes = unique(pData[[class_name]])
-  drop_tot = c()
-  for(class in classes){
-    class_exprs = exprs[,colnames(exprs) %in% pData$ID[pData[[class_name]] == class]]
-    perc_NA = apply(class_exprs, 1, function(x) sum(is.na(x))/length(x))
-    drop = names(perc_NA)[perc_NA > perc]
-    drop_tot = append(drop_tot, drop)
-    print(paste0('Class: ', class, ', drop: ', length(drop)))
-  }
-  drop_tot = unique(drop_tot)
-  print(paste0('Total drops: ', length(drop_tot)))
-  return(drop_tot)
-}
-
-pData = data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group)
-pData$age_group = as.character(pData$age_group)
-pData$age_group[pData$age_group != 'Fetal'] = 'Postnatal'
-high_NA_perc = detect_high_NA_perc(exprs_c, pData)
-
-exprs(LumiBatch_c) = exprs_c
-LumiBatch_c = LumiBatch_c[!rownames(LumiBatch_c) %in% high_NA_perc,]
-exprs_c = exprs(LumiBatch_c)
-LumiBatch_v = LumiBatch_v[!rownames(LumiBatch_v) %in% high_NA_perc,]
-exprs_v = exprs(LumiBatch_v)
+# # 1 Drop low intensity values and filter probes with <0.5 fetal or postnatal data
+# exprs_c[exprs_c<39.4] = NA
+# detect_high_NA_perc = function(exprs, pData, perc=0.5){
+#   class_name = colnames(pData)[2]
+#   classes = unique(pData[[class_name]])
+#   drop_tot = c()
+#   for(class in classes){
+#     class_exprs = exprs[,colnames(exprs) %in% pData$ID[pData[[class_name]] == class]]
+#     perc_NA = apply(class_exprs, 1, function(x) sum(is.na(x))/length(x))
+#     drop = names(perc_NA)[perc_NA > perc]
+#     drop_tot = append(drop_tot, drop)
+#     print(paste0('Class: ', class, ', drop: ', length(drop)))
+#   }
+#   drop_tot = unique(drop_tot)
+#   print(paste0('Total drops: ', length(drop_tot)))
+#   return(drop_tot)
+# }
+# 
+# pData = data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group)
+# pData$age_group = as.character(pData$age_group)
+# pData$age_group[pData$age_group != 'Fetal'] = 'Postnatal'
+# high_NA_perc = detect_high_NA_perc(exprs_c, pData)
+# 
+# exprs(LumiBatch_c) = exprs_c
+# LumiBatch_c = LumiBatch_c[!rownames(LumiBatch_c) %in% high_NA_perc,]
+# exprs_c = exprs(LumiBatch_c)
+# LumiBatch_v = LumiBatch_v[!rownames(LumiBatch_v) %in% high_NA_perc,]
+# exprs_v = exprs(LumiBatch_v)
 
 # 2 Outliers (>6 mean average deviations from the age-appropriate/disease status linear fit)
 detect_outliers = function(exprs, pData){
@@ -176,21 +177,24 @@ if(plot_pca){
 }
 
 # experiment
-pca = prepare_pca_c_vs_v(exprs_c, exprs_v-min_exprs_v, pData_c, pData_v, 'Filtering samples')
+# pca = prepare_pca_c_vs_v(exprs_c, exprs_v-min_exprs_v, pData_c, pData_v, 
+# 'Voienagus data - min(v_data)')
 ######################################################################################################
 ######################################################################################################
-# # Background correction
-# 
+# Background correction
+
 # lumiB(LumiBatch_c, method='bgAdjust') # The data has already been background adjusted!
 # lumiB(LumiBatch_v, method='bgAdjust') # There is no control probe information in the LumiBatch object!
 # 
 # # Dataset comparison
 # exprs_v_control=exprs_c[,colnames(exprs_v) %in% rownames(pData_v[pData_v$Disease.status=='control',])]
 # mean_exprs_v = data.frame('ID'=rownames(exprs_v), 'mean_v'=apply(exprs_v, 1, mean))
+# #mean_exprs_v = mean_exprs_v[mean_exprs_v$mean_v > 1000 ,]
 # 
 # exprs_c_non_fetal = exprs_c[,colnames(exprs_c) %in% rownames(pData_c[pData_c$age_group != 'Fetal',])]
 # mean_exprs_c = data.frame('ID'=rownames(exprs_c_non_fetal), 'mean_c'=apply(exprs_c_non_fetal, 1, mean))
-# mean_exprs_c = mean_exprs_c[mean_exprs_c$mean_c > min(mean_exprs_v$mean_v)*2,]
+# #mean_exprs_c = mean_exprs_c[mean_exprs_c$mean_c > 1000 ,]
+# #mean_exprs_c = mean_exprs_c[mean_exprs_c$mean_c > min(mean_exprs_v$mean_v),]
 # 
 # mean_exprs = merge(mean_exprs_c, mean_exprs_v, by='ID')
 # rownames(mean_exprs) = mean_exprs$ID
@@ -198,7 +202,13 @@ pca = prepare_pca_c_vs_v(exprs_c, exprs_v-min_exprs_v, pData_c, pData_v, 'Filter
 # 
 # library(ggplot2)
 # ggplot(log(mean_exprs), aes(x=mean_c, y=mean_v)) + geom_point(alpha=0.5) +
-#   geom_smooth(method='lm', formula=y~x) + theme_minimal()
+#   geom_smooth(method='lm', formula=y~x) + theme_minimal() + ggtitle('Filtering probes < 1000') +
+#   theme(plot.title = element_text(hjust = 0.5))
+# 
+# sorted_df = data.frame('sorted_c'=sort(mean_exprs_c$mean_c), 'sorted_v'=sort(mean_exprs_v$mean_v))
+# ggplot(log(sorted_df), aes(x=sorted_c, y=sorted_v)) + geom_point(alpha=0.5) +
+#   geom_smooth(method='lm', formula=y~x) + theme_minimal() + 
+#   ggtitle('Ordered match instead of probe match') + theme(plot.title = element_text(hjust = 0.5))
 
 ######################################################################################################
 ######################################################################################################
@@ -212,13 +222,21 @@ rownames(reference) = reference$HEEBO_ID
 reference$HEEBO_ID = NULL
 colnames(reference) = sapply(colnames(reference), function(x) unlist(strsplit(x, '\\.'))[1])
 
-heebo_ilmn_map = data.frame(map_HEEBO_ILMN_ids()[2])
+heebo_ilmn_map = data.frame(map_HEEBO_ILMN_ids()[1])
 remaining_genes = heebo_ilmn_map[heebo_ilmn_map$ILMN_ID %in% rownames(exprs_c),]
-heebo_to_ilmn = remaining_genes$ILMN_ID
-names(heebo_to_ilmn) = remaining_genes$HEEBO_ID
 
-reference = reference[rownames(reference) %in% names(heebo_to_ilmn),]
-rownames(reference) = heebo_to_ilmn[rownames(reference)]
+# heebo_to_ilmn = remaining_genes$ILMN_ID
+# names(heebo_to_ilmn) = remaining_genes$HEEBO_ID
+# reference = reference[rownames(reference) %in% names(heebo_to_ilmn),]
+# rownames(reference) = heebo_to_ilmn[rownames(reference)]
+
+# Collapse probes
+reference_genes = remaining_genes$Gene_Symbol[match(rownames(reference), remaining_genes$HEEBO_ID)]
+collapse_rows = collapseRows(reference, rowGroup=reference_genes, rowID=rownames(reference), 
+                             method = 'Average')
+reference = as.data.frame(collapse_rows$datETcollapsed)
+reference_ILMN_ids = remaining_genes$ILMN_ID[match(rownames(reference), remaining_genes$Gene_Symbol)]
+rownames(reference) = reference_ILMN_ids
 
 ratio_c = (exprs_c+1)/(reference+1)
 
@@ -233,7 +251,8 @@ exprs_c = exprs(LumiBatch_c)
 exprs(LumiBatch_v) = as.matrix(ratio_v[,colnames(ratio_v) %in% colnames(exprs_v)])
 exprs_v = exprs(LumiBatch_v)
 
-remove(heebo_ilmn_map, ratio_c, row_mean, ratio_v, heebo_to_ilmn, remaining_genes, reference)
+remove(heebo_ilmn_map, ratio_c, row_mean, ratio_v, heebo_to_ilmn, remaining_genes, reference, 
+       collapse_rows)
 ######################################################################################################
 # PCA Check:
 if(plot_pca){
@@ -281,175 +300,176 @@ if(plot_pca){
 }
 ######################################################################################################
 ######################################################################################################
-# Impute missing data
-
-# Data seems to distribute ~Normal, so impute data with rnorm(row mean, row sd)
-impute_data = function(exprs, pData){
-  class_name = colnames(pData)[2]
-  classes = unique(pData[[class_name]])
-  is_na = is.na(exprs)
-  for(class in classes) {
-    class_exprs = exprs[, colnames(exprs) %in% pData$ID[pData[[class_name]] == class]]
-    class_is_na = is_na[, colnames(is_na) %in% pData$ID[pData[[class_name]] == class]]
-    na_counts = apply(class_is_na, 1, sum)
-    names(na_counts) = rownames(class_exprs)
-    rows_with_nas = names(na_counts)[na_counts>0]
-    for(row in rows_with_nas) {
-      row_data = class_exprs[row,]
-      row_data = as.numeric(row_data)
-      if(sum(!is.na(row_data))==1) {
-        print(paste0('1 sample for class ', class))
-        mean = row_data[!is.na(row_data)]
-        sd = sd(exprs[row,], na.rm=TRUE)/10
-      } else {
-        if(sum(!is.na(row_data))==0) {
-          print(paste0('No samples for class ', class))
-          row_data = exprs[row,]
-        }
-        mean = mean(row_data, na.rm=T)
-        sd = sd(row_data, na.rm=T)
-      }
-      rand_samps = rnorm(sum(is.na(row_data)), mean, sd)
-      #rand_samps = rep(NA, sum(is.na(row_data)))
-      cols = colnames(class_exprs)[is.na(row_data)]
-      exprs[row, cols] = rand_samps
-    }
-  }
-  return(exprs)
-}
-
-pData = data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group)
-exprs_c_imp = impute_data(exprs_c, pData)
-
-# Check: Removes all nas:
-sum(is.na(exprs_c_imp))==0
-
-# Check: Only na values are modified
-all.equal(exprs_c[!is.na(exprs_c)], exprs_c_imp[!is.na(exprs_c)])
-
-# Check: statistics segmented by complete and imputed probes
-na_counts = apply(is.na(exprs_c), 1, sum)
-with_nas = rownames(exprs_c)
-with_nas = with_nas[na_counts>0]
-
-stats_df = data.frame('has_nas' = na_counts>0, 'n_nas'=na_counts,
-                      'mean' = apply(exprs_c_imp, 1, function(x) mean(x, na.rm=TRUE)),
-                      'sd' = apply(exprs_c_imp, 1, function(x) sd(x, na.rm=TRUE)))
-
-ggplot(stats_df, aes(x=has_nas, y=mean, fill=has_nas)) + geom_boxplot() +
-  xlab('Probe has NA values') + ylab('Probe Mean') + theme_minimal() + theme(legend.position='none')
-
-ggplot(stats_df, aes(x=has_nas, y=sd, fill=has_nas)) + geom_boxplot() +
-  xlab('Probe has NA values') + ylab('Probe SD') + theme_minimal() + theme(legend.position='none')
-
-# Check: values distribution by age
-stats_by_age_group = function(exprs, pData){
-  class_name = colnames(pData)[2]
-  classes = unique(pData[[class_name]])
-  is_na = is.na(exprs)
-  mean_df = data.frame('ID'=rownames(exprs))
-  sd_df = mean_df
-  for(class in classes){
-    class_exprs = exprs[, colnames(exprs) %in% pData$ID[pData[[class_name]] == class]]
-    class_mean = apply(class_exprs, 1, function(x) mean(x, na.rm=TRUE))
-    class_sd = apply(class_exprs, 1, function(x) sd(x, na.rm=TRUE))
-    mean_df = cbind(mean_df, data.frame(class=class_mean))
-    sd_df = cbind(sd_df, data.frame(class=class_sd))
-  }
-  colnames(mean_df) = append('ID',as.character(classes))
-  colnames(sd_df) = append('ID',as.character(classes))
-  
-  return(list(mean_df, sd_df))
-}
-
-stats_by_age_orig = stats_by_age_group(exprs_c, pData)
-mean_by_age_orig = data.frame(stats_by_age_orig[1])
-sd_by_age_orig = data.frame(stats_by_age_orig[2])
-
-stats_by_age_imp = stats_by_age_group(exprs_c_imp, pData)
-mean_by_age_imp = data.frame(stats_by_age_imp[1])
-sd_by_age_imp = data.frame(stats_by_age_imp[2])
-
-ordered_levels = c('Fetal','Infant','Child','10.20','20s','30s','40s','50s','60s','70s')
-
-# Means distribution
-melt_mean_by_age_orig = melt(mean_by_age_orig, id.vars = 'ID')
-melt_mean_by_age_orig_has_nas = melt_mean_by_age_orig[melt_mean_by_age_orig$ID %in% with_nas,]
-melt_mean_by_age_orig_has_nas$variable = gsub('X','',melt_mean_by_age_orig_has_nas$variable)
-melt_mean_by_age_orig_has_nas = transform(melt_mean_by_age_orig_has_nas,
-                                          variable=factor(variable, levels = ordered_levels))
-  
-melt_mean_by_age_imp = melt(mean_by_age_imp, id.vars = 'ID')
-melt_mean_by_age_imp_has_nas = melt_mean_by_age_imp[melt_mean_by_age_imp$ID %in% with_nas,]
-melt_mean_by_age_imp_has_nas$variable = gsub('X','',melt_mean_by_age_imp_has_nas$variable)
-melt_mean_by_age_imp_has_nas = transform(melt_mean_by_age_imp_has_nas,
-                                          variable=factor(variable, levels = ordered_levels))
-
-mean_min_y_val = min(min(melt_mean_by_age_orig_has_nas$value), min(melt_mean_by_age_imp_has_nas$value))
-mean_max_y_val = max(max(melt_mean_by_age_orig_has_nas$value), max(melt_mean_by_age_imp_has_nas$value))
-
-ggplot(melt_mean_by_age_orig_has_nas, aes(x=variable, y=value, fill=variable)) + geom_boxplot() +
-  xlab('Age Group') + ylab('Probe Mean') + theme_minimal() + theme(legend.position='none') +
-  ggtitle('Only original values') + theme(plot.title = element_text(hjust = 0.5)) +
-  coord_cartesian(ylim=c(mean_min_y_val, mean_max_y_val))
-
-ggplot(melt_mean_by_age_imp_has_nas, aes(x=variable, y=value, fill=variable)) + geom_boxplot() +
-  xlab('Age Group') + ylab('Probe Mean') + theme_minimal() + theme(legend.position='none') +
-  ggtitle('Including imputed values') + theme(plot.title = element_text(hjust = 0.5)) +
-  coord_cartesian(ylim=c(mean_min_y_val, mean_max_y_val))
-
-# SDs distribution
-melt_sd_by_age_orig = melt(sd_by_age_orig, id.vars = 'ID')
-melt_sd_by_age_orig_has_nas = melt_sd_by_age_orig[melt_sd_by_age_orig$ID %in% with_nas,]
-melt_sd_by_age_orig_has_nas$variable = gsub('X','',melt_sd_by_age_orig_has_nas$variable)
-melt_sd_by_age_orig_has_nas = transform(melt_sd_by_age_orig_has_nas,
-                                          variable=factor(variable, levels = ordered_levels))
-
-melt_sd_by_age_imp = melt(sd_by_age_imp, id.vars = 'ID')
-melt_sd_by_age_imp_has_nas = melt_sd_by_age_imp[melt_sd_by_age_imp$ID %in% with_nas,]
-melt_sd_by_age_imp_has_nas$variable = gsub('X','',melt_sd_by_age_imp_has_nas$variable)
-melt_sd_by_age_imp_has_nas = transform(melt_sd_by_age_imp_has_nas,
-                                         variable=factor(variable, levels = ordered_levels))
-
-sd_min_y_val = min(min(melt_sd_by_age_orig_has_nas$value, na.rm=TRUE), 
-                   min(melt_sd_by_age_imp_has_nas$value, na.rm=TRUE))
-sd_max_y_val = max(max(melt_sd_by_age_orig_has_nas$value, na.rm=TRUE), 
-                   max(melt_sd_by_age_imp_has_nas$value, na.rm=TRUE))
-
-ggplot(melt_sd_by_age_orig_has_nas, aes(x=variable, y=value, fill=variable)) + geom_boxplot() +
-  xlab('Age Group') + ylab('Probe SD') + theme_minimal() + theme(legend.position='none') +
-  ggtitle('Only original values') + theme(plot.title = element_text(hjust = 0.5)) +
-  coord_cartesian(ylim=c(sd_min_y_val, sd_max_y_val))
-
-ggplot(melt_sd_by_age_imp_has_nas, aes(x=variable, y=value, fill=variable)) + geom_boxplot() +
-  xlab('Age Group') + ylab('Probe SD') + theme_minimal() + theme(legend.position='none') +
-  ggtitle('Including imputed values') + theme(plot.title = element_text(hjust = 0.5)) +
-  coord_cartesian(ylim=c(sd_min_y_val, sd_max_y_val))
-
-
-pca = perform_pca(exprs_c_imp, pData, 'Including rows with imputed data')
-pca = perform_pca(exprs_c_imp[na_counts==0,], pData, 'Removing rows with imputed data')
-
-exprs(LumiBatch_c) = exprs_c
-
-######################################################################################################
-# Prueba con matriz chica
-a = data.frame('a'=c(1,2,3,4,5),'b'=c(5,6,7,8,9))
-a$a1 = a$a; a$a2 = a$a; a$a3 = a$a; a$a4 = a$a
-a$b1 = a$b; a$b2 = a$b; a$b3 = a$b; a$b4 = a$b
-a[3, sample(ncol(a),5)] = NA
-a$c1 = c(3,4,5,6,7)
-a$c2 = c(3,NA,5,6,7)
-pData_a = data.frame('ID'=colnames(a), 'class'=c('a','b','a','a','a','a','b','b','b','b','c','c'))
-a_impute = impute_data(a, pData_a)
-######################################################################################################
-# PCA Check:
-if(plot_pca){
-  pca = prepare_pca_c_vs_v(exprs_c, exprs_v, pData_c, pData_v, 'Imputing missing data')
-  pca = prepare_pca_c_vs_v(exprs_c, exprs_v, pData_c, pData_v, 'Imputing missing data',
-                           by='age_group')
-  remove(pca)
-}
+# # Impute missing data
+# 
+# # Data seems to distribute ~Normal, so impute data with rnorm(row mean, row sd)
+# impute_data = function(exprs, pData){
+#   class_name = colnames(pData)[2]
+#   classes = unique(pData[[class_name]])
+#   is_na = is.na(exprs)
+#   for(class in classes) {
+#     class_exprs = exprs[, colnames(exprs) %in% pData$ID[pData[[class_name]] == class]]
+#     class_is_na = is_na[, colnames(is_na) %in% pData$ID[pData[[class_name]] == class]]
+#     na_counts = apply(class_is_na, 1, sum)
+#     names(na_counts) = rownames(class_exprs)
+#     rows_with_nas = names(na_counts)[na_counts>0]
+#     for(row in rows_with_nas) {
+#       row_data = class_exprs[row,]
+#       row_data = as.numeric(row_data)
+#       if(sum(!is.na(row_data))==1) {
+#         print(paste0('1 sample for class ', class))
+#         mean = row_data[!is.na(row_data)]
+#         sd = sd(exprs[row,], na.rm=TRUE)/10
+#       } else {
+#         if(sum(!is.na(row_data))==0) {
+#           print(paste0('No samples for class ', class))
+#           row_data = exprs[row,]
+#         }
+#         mean = mean(row_data, na.rm=T)
+#         sd = sd(row_data, na.rm=T)
+#       }
+#       rand_samps = rnorm(sum(is.na(row_data)), mean, sd)
+#       #rand_samps = rep(NA, sum(is.na(row_data)))
+#       cols = colnames(class_exprs)[is.na(row_data)]
+#       exprs[row, cols] = rand_samps
+#     }
+#   }
+#   return(exprs)
+# }
+# 
+# pData = data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group)
+# exprs_c_imp = impute_data(exprs_c, pData)
+# 
+# # Check: Removes all nas:
+# sum(is.na(exprs_c_imp))==0
+# 
+# # Check: Only na values are modified
+# all.equal(exprs_c[!is.na(exprs_c)], exprs_c_imp[!is.na(exprs_c)])
+# 
+# # Check: statistics segmented by complete and imputed probes
+# na_counts = apply(is.na(exprs_c), 1, sum)
+# with_nas = rownames(exprs_c)
+# with_nas = with_nas[na_counts>0]
+# 
+# stats_df = data.frame('has_nas' = na_counts>0, 'n_nas'=na_counts,
+#                       'mean' = apply(exprs_c_imp, 1, function(x) mean(x, na.rm=TRUE)),
+#                       'sd' = apply(exprs_c_imp, 1, function(x) sd(x, na.rm=TRUE)))
+# 
+# ggplot(stats_df, aes(x=has_nas, y=mean, fill=has_nas)) + geom_boxplot() +
+#   xlab('Probe has NA values') + ylab('Probe Mean') + theme_minimal() + theme(legend.position='none')
+# 
+# ggplot(stats_df, aes(x=has_nas, y=sd, fill=has_nas)) + geom_boxplot() +
+#   xlab('Probe has NA values') + ylab('Probe SD') + theme_minimal() + theme(legend.position='none')
+# 
+# # Check: values distribution by age
+# stats_by_age_group = function(exprs, pData){
+#   class_name = colnames(pData)[2]
+#   classes = unique(pData[[class_name]])
+#   is_na = is.na(exprs)
+#   mean_df = data.frame('ID'=rownames(exprs))
+#   sd_df = mean_df
+#   for(class in classes){
+#     class_exprs = exprs[, colnames(exprs) %in% pData$ID[pData[[class_name]] == class]]
+#     class_mean = apply(class_exprs, 1, function(x) mean(x, na.rm=TRUE))
+#     class_sd = apply(class_exprs, 1, function(x) sd(x, na.rm=TRUE))
+#     mean_df = cbind(mean_df, data.frame(class=class_mean))
+#     sd_df = cbind(sd_df, data.frame(class=class_sd))
+#   }
+#   colnames(mean_df) = append('ID',as.character(classes))
+#   colnames(sd_df) = append('ID',as.character(classes))
+#   
+#   return(list(mean_df, sd_df))
+# }
+# 
+# stats_by_age_orig = stats_by_age_group(exprs_c, pData)
+# mean_by_age_orig = data.frame(stats_by_age_orig[1])
+# sd_by_age_orig = data.frame(stats_by_age_orig[2])
+# 
+# stats_by_age_imp = stats_by_age_group(exprs_c_imp, pData)
+# mean_by_age_imp = data.frame(stats_by_age_imp[1])
+# sd_by_age_imp = data.frame(stats_by_age_imp[2])
+# 
+# ordered_levels = c('Fetal','Infant','Child','10.20','20s','30s','40s','50s','60s','70s')
+# 
+# # Means distribution
+# melt_mean_by_age_orig = melt(mean_by_age_orig, id.vars = 'ID')
+# melt_mean_by_age_orig_has_nas = melt_mean_by_age_orig[melt_mean_by_age_orig$ID %in% with_nas,]
+# melt_mean_by_age_orig_has_nas$variable = gsub('X','',melt_mean_by_age_orig_has_nas$variable)
+# melt_mean_by_age_orig_has_nas = transform(melt_mean_by_age_orig_has_nas,
+#                                           variable=factor(variable, levels = ordered_levels))
+#   
+# melt_mean_by_age_imp = melt(mean_by_age_imp, id.vars = 'ID')
+# melt_mean_by_age_imp_has_nas = melt_mean_by_age_imp[melt_mean_by_age_imp$ID %in% with_nas,]
+# melt_mean_by_age_imp_has_nas$variable = gsub('X','',melt_mean_by_age_imp_has_nas$variable)
+# melt_mean_by_age_imp_has_nas = transform(melt_mean_by_age_imp_has_nas,
+#                                           variable=factor(variable, levels = ordered_levels))
+# 
+# mean_min_y_val = min(min(melt_mean_by_age_orig_has_nas$value), min(melt_mean_by_age_imp_has_nas$value))
+# mean_max_y_val = max(max(melt_mean_by_age_orig_has_nas$value), max(melt_mean_by_age_imp_has_nas$value))
+# 
+# ggplot(melt_mean_by_age_orig_has_nas, aes(x=variable, y=value, fill=variable)) + geom_boxplot() +
+#   xlab('Age Group') + ylab('Probe Mean') + theme_minimal() + theme(legend.position='none') +
+#   ggtitle('Only original values') + theme(plot.title = element_text(hjust = 0.5)) +
+#   coord_cartesian(ylim=c(mean_min_y_val, mean_max_y_val))
+# 
+# ggplot(melt_mean_by_age_imp_has_nas, aes(x=variable, y=value, fill=variable)) + geom_boxplot() +
+#   xlab('Age Group') + ylab('Probe Mean') + theme_minimal() + theme(legend.position='none') +
+#   ggtitle('Including imputed values') + theme(plot.title = element_text(hjust = 0.5)) +
+#   coord_cartesian(ylim=c(mean_min_y_val, mean_max_y_val))
+# 
+# # SDs distribution
+# melt_sd_by_age_orig = melt(sd_by_age_orig, id.vars = 'ID')
+# melt_sd_by_age_orig_has_nas = melt_sd_by_age_orig[melt_sd_by_age_orig$ID %in% with_nas,]
+# melt_sd_by_age_orig_has_nas$variable = gsub('X','',melt_sd_by_age_orig_has_nas$variable)
+# melt_sd_by_age_orig_has_nas = transform(melt_sd_by_age_orig_has_nas,
+#                                           variable=factor(variable, levels = ordered_levels))
+# 
+# melt_sd_by_age_imp = melt(sd_by_age_imp, id.vars = 'ID')
+# melt_sd_by_age_imp_has_nas = melt_sd_by_age_imp[melt_sd_by_age_imp$ID %in% with_nas,]
+# melt_sd_by_age_imp_has_nas$variable = gsub('X','',melt_sd_by_age_imp_has_nas$variable)
+# melt_sd_by_age_imp_has_nas = transform(melt_sd_by_age_imp_has_nas,
+#                                          variable=factor(variable, levels = ordered_levels))
+# 
+# sd_min_y_val = min(min(melt_sd_by_age_orig_has_nas$value, na.rm=TRUE), 
+#                    min(melt_sd_by_age_imp_has_nas$value, na.rm=TRUE))
+# sd_max_y_val = max(max(melt_sd_by_age_orig_has_nas$value, na.rm=TRUE), 
+#                    max(melt_sd_by_age_imp_has_nas$value, na.rm=TRUE))
+# 
+# ggplot(melt_sd_by_age_orig_has_nas, aes(x=variable, y=value, fill=variable)) + geom_boxplot() +
+#   xlab('Age Group') + ylab('Probe SD') + theme_minimal() + theme(legend.position='none') +
+#   ggtitle('Only original values') + theme(plot.title = element_text(hjust = 0.5)) +
+#   coord_cartesian(ylim=c(sd_min_y_val, sd_max_y_val))
+# 
+# ggplot(melt_sd_by_age_imp_has_nas, aes(x=variable, y=value, fill=variable)) + geom_boxplot() +
+#   xlab('Age Group') + ylab('Probe SD') + theme_minimal() + theme(legend.position='none') +
+#   ggtitle('Including imputed values') + theme(plot.title = element_text(hjust = 0.5)) +
+#   coord_cartesian(ylim=c(sd_min_y_val, sd_max_y_val))
+# 
+# 
+# pca = perform_pca(exprs_c_imp, pData, 'Including rows with imputed data')
+# pca = perform_pca(exprs_c_imp[na_counts==0,], pData, 'Removing rows with imputed data')
+# pca = perform_pca(exprs_c_imp[na_counts>0,], pData, 'Removing rows without imputed data')
+# 
+# #exprs(LumiBatch_c) = exprs_c_imp
+# 
+# ######################################################################################################
+# # Prueba con matriz chica
+# a = data.frame('a'=c(1,2,3,4,5),'b'=c(5,6,7,8,9))
+# a$a1 = a$a; a$a2 = a$a; a$a3 = a$a; a$a4 = a$a
+# a$b1 = a$b; a$b2 = a$b; a$b3 = a$b; a$b4 = a$b
+# a[3, sample(ncol(a),5)] = NA
+# a$c1 = c(3,4,5,6,7)
+# a$c2 = c(3,NA,5,6,7)
+# pData_a = data.frame('ID'=colnames(a), 'class'=c('a','b','a','a','a','a','b','b','b','b','c','c'))
+# a_impute = impute_data(a, pData_a)
+# ######################################################################################################
+# # PCA Check:
+# if(plot_pca){
+#   pca = prepare_pca_c_vs_v(exprs_c, exprs_v, pData_c, pData_v, 'Imputing missing data')
+#   pca = prepare_pca_c_vs_v(exprs_c, exprs_v, pData_c, pData_v, 'Imputing missing data',
+#                            by='age_group')
+#   remove(pca)
+# }
 ######################################################################################################
 ######################################################################################################
 # COMBAT BATCH CORRECTION
@@ -499,5 +519,5 @@ if(plot_pca){
 exprs(LumiBatch_c) = as.matrix(exprs_c)
 exprs(LumiBatch_v) = as.matrix(exprs_v)
 
-save(LumiBatch_c, file='Data/LumiBatch_Colantuoni_preprocessed.RData')
-save(LumiBatch_v, file='Data/LumiBatch_Voineagu_preprocessed.RData')
+save(LumiBatch_c, file='Data/LumiBatch_Colantuoni_preprocessed_big.RData')
+save(LumiBatch_v, file='Data/LumiBatch_Voineagu_preprocessed_big.RData')
