@@ -26,8 +26,7 @@ assayData = assayData[rownames(assayData) %in% heebo_gene_map$ID,]
 
 # Average probe values corresponding to a same gene
 assayData_genes = heebo_gene_map$Gene_Symbol[match(rownames(assayData), heebo_gene_map$ID)]
-collapse_rows = collapseRows(assayData, rowGroup=assayData_genes, rowID=rownames(assayData), 
-                             method = 'Average')
+collapse_rows = collapseRows(assayData, rowGroup=assayData_genes, rowID=rownames(assayData))
 assayData = as.data.frame(collapse_rows$datETcollapsed)
 
 # Filter probes corresponding to genes not present in Voineagu's experiment
@@ -69,7 +68,7 @@ phenoData$age_group = as.character(age_group)
 LumiBatch_c = new('LumiBatch', exprs = as.matrix(exprs), se.exprs = as.matrix(se.exprs))
 pData(LumiBatch_c) = phenoData
 
-save(LumiBatch_c, file='Data/LumiBatch_Colantuoni_big.RData')
+save(LumiBatch_c, file='Data/LumiBatch_Colantuoni.RData')
 
 
 remove(collapse_rows, gpl, heebo_gene_map, assayData, exprs, se.exprs, gse, assayData_genes, 
@@ -95,8 +94,7 @@ colnames(LumiBatch_v) = chipArray_to_gsm[colnames(LumiBatch_v)]
 assayData = data.frame(exprs(LumiBatch_v))
 assayData = assayData[rownames(assayData) %in% heebo_ilmn_map$ILMN_ID,]
 assayData_genes = heebo_ilmn_map$Gene_Symbol[match(rownames(assayData), heebo_ilmn_map$ILMN_ID)]
-collapse_rows = collapseRows(assayData, rowGroup=assayData_genes, rowID=rownames(assayData), 
-                             method = 'Average')
+collapse_rows = collapseRows(assayData, rowGroup=assayData_genes, rowID=rownames(assayData))
 assayData = as.data.frame(collapse_rows$datETcollapsed)
 assayData_ILMN_ids = gene_ilmn_map$ILMN_ID[match(rownames(assayData), gene_ilmn_map$Gene_Symbol)]
 rownames(assayData) = assayData_ILMN_ids
@@ -112,7 +110,7 @@ exprs(LumiBatch_v) = as.matrix(assayData)
 pData(LumiBatch_v) = phenoData
 
 
-save(LumiBatch_v, file='Data/LumiBatch_Voineagu_big.RData')
+save(LumiBatch_v, file='Data/LumiBatch_Voineagu.RData')
 
 
 remove(assayData, collapse_rows, gene_ilmn_map, heebo_ilmn_map, assayData_genes, 

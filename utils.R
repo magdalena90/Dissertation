@@ -10,6 +10,11 @@ library(plsgenomics) # PLS.LDA
 library(caret)
 library(samr)
 
+gg_color_hue = function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
 map_HEEBO_ILMN_ids = function(){
   # Output: Dataframe with all the genes present in both datasets with their corresponding ids
   #         Dataframe columns: Gene_Symbol, HEEBO_ID and ILMN_ID
@@ -288,6 +293,10 @@ perform_tsne = function(df, labels, perplexity, title){
 }
 
 identify_significant_genes = function(exprs, labels, source, fdr = 0.05){
+  # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
+  #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
+  # Output: data frame with statistically significant genes
+  
   if(source == 'Colantuoni'){
     obj.var = 'age_group'
     resp.type = 'Multiclass'
@@ -302,15 +311,21 @@ identify_significant_genes = function(exprs, labels, source, fdr = 0.05){
   SAM_fit = SAM(exprs, as.factor(labels[[obj.var]]), resp.type=resp.type, 
                 geneid=rownames(exprs), random.seed=1234, logged2=TRUE, fdr.output=fdr)
   signif_genes = data.frame(SAM_fit$siggenes.table$genes.up)
+  print(paste0(nrow(SAM_fit$siggenes.table$genes.up), ' upregulated genes'))
+  print(paste0(nrow(SAM_fit$siggenes.table$genes.do), ' downregulated genes'))
   signif_genes = signif_genes[as.numeric(as.character(signif_genes$Fold.Change))>1.3,]
   
   # Detect significant genes for gender identification and remove them from list
-  SAM_fit_sex = SAM(exprs, as.factor(pData_v[[sex_col]]), resp.type=resp.type, 
+  SAM_fit_sex = SAM(exprs, as.factor(labels[[sex_col]]), resp.type=resp.type, 
                     geneid=rownames(exprs), random.seed=1234, logged2=TRUE, fdr.output=fdr)
   signif_genes_sex = data.frame(SAM_fit_sex$siggenes.table$genes.up)
+  print(paste0(nrow(SAM_fit_sex$siggenes.table$genes.up), ' upregulated genes for sex'))
+  print(paste0(nrow(SAM_fit_sex$siggenes.table$genes.do), ' downregulated genes for sex'))
   signif_genes_sex = signif_genes_sex[as.numeric(as.character(signif_genes_sex$Fold.Change))>1.3,]
   
   signif_genes = signif_genes[!signif_genes$Gene.Name %in% signif_genes_sex$Gene.Name,]
+  signif_genes$Score.d. = as.numeric(as.character(signif_genes$Score.d.))
+  print(paste0(nrow(signif_genes), ' statistically significant genes found'))
   
   return(signif_genes)
 }
