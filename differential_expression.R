@@ -228,3 +228,37 @@ sum(res_sign_genes$Gene.Name %in% age_signif_genes$Gene.Name)/nrow(res_sign_gene
 
 sum(age_signif_genes$Gene.Name %in% res_sign_genes$Gene.Name)/nrow(age_signif_genes)
 
+######################################################################################################
+# HIERARCHICAL CLUSTERING AND HEATMAP FOR 200 DE GENES
+
+# 200 DE genes
+top_200_DE_genes = age_signif_genes[with(age_signif_genes,order(-Score.d.)),]
+top_200_DE_genes = top_200_DE_genes[1:200,]
+exprs_top_200 = data.frame(exprs[rownames(exprs) %in% top_200_DE_genes$Gene.Name,])
+pData$PMI = as.numeric(pData$`postmortem interval (pmi):ch1`)
+
+# Color palettes
+rg_palette = colorRampPalette(c('green', 'green', 'black', 'red', 'red'))(n = 100)
+
+colormap_age = gg_color_hue(10)
+names(colormap_age) = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
+
+colormap_sex = c(gg_color_hue(2),'#ffffff')
+names(colormap_sex)= c('F', 'M', '5')
+
+# Heatmap
+annotation_df = data.frame('Disease'=pData$age_group)
+cols_annotation_df = list('Disease'=colormap_age)
+hm_top_annotation = HeatmapAnnotation(annotation_df, col=cols_annotation_df)
+
+annotation_df = data.frame('Sex'=pData$`Sex:ch1`, 'PMI'=pData$PMI)
+cols_annotation_df = list('Sex'=colormap_sex, 'PMI'=circlize::colorRamp2(c(1, 10),
+                          c('#FF0080', '#00FF80')))
+hm_bottom_annotation = HeatmapAnnotation(annotation_df, col = cols_annotation_df)
+
+Heatmap(exprs_top_200, name='Expression levels', column_title='Samples', row_title='Genes',
+        show_row_names=F, show_column_names=F, cluster_rows=F, col=rg_palette, show_heatmap_legend=F,
+        top_annotation=hm_top_annotation, bottom_annotation=hm_bottom_annotation,
+        top_annotation_height=unit(3, 'mm'), bottom_annotation_height=unit(6, 'mm') )
+
+remove(annotation_df, cols_annotation_df, hm_bottom_annotation, hm_top_annotation)

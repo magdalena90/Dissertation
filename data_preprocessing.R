@@ -188,26 +188,26 @@ if(plot_pca){
 # lumiB(LumiBatch_c, method='bgAdjust') # The data has already been background adjusted!
 # lumiB(LumiBatch_v, method='bgAdjust') # There is no control probe information in the LumiBatch object!
 # 
-# Dataset comparison
-exprs_v_control=exprs_c[,colnames(exprs_v) %in% rownames(pData_v[pData_v$Disease.status=='control',])]
-mean_exprs_v = data.frame('ID'=rownames(exprs_v), 'mean_v'=apply(exprs_v, 1, mean))
-#mean_exprs_v = mean_exprs_v[mean_exprs_v$mean_v > 1000 ,]
-
-exprs_c_non_fetal = exprs_c[,colnames(exprs_c) %in% rownames(pData_c[pData_c$age_group != 'Fetal',])]
-mean_exprs_c = data.frame('ID'=rownames(exprs_c_non_fetal), 'mean_c'=apply(exprs_c_non_fetal, 1, mean))
-#mean_exprs_c = mean_exprs_c[mean_exprs_c$mean_c > 1000 ,]
-#mean_exprs_c = mean_exprs_c[mean_exprs_c$mean_c > min(mean_exprs_v$mean_v),]
-
-mean_exprs = merge(mean_exprs_c, mean_exprs_v, by='ID')
-rownames(mean_exprs) = mean_exprs$ID
-mean_exprs$ID = NULL
-
-library(ggplot2)
-ggplot((mean_exprs), aes(x=mean_c, y=mean_v)) + geom_point(alpha=0.25) +
-  geom_smooth(method='lm', formula=y~x) + theme_minimal() +
-  ggtitle('Scatter plot for preprocessed data') +
-  theme(plot.title = element_text(hjust=0.5)) + xlab('Colantuoni\'s data') +
-  ylab('Voineagu\'s data')
+# # Dataset comparison
+# exprs_v_control=exprs_c[,colnames(exprs_v) %in% rownames(pData_v[pData_v$Disease.status=='control',])]
+# mean_exprs_v = data.frame('ID'=rownames(exprs_v), 'mean_v'=apply(exprs_v, 1, mean))
+# #mean_exprs_v = mean_exprs_v[mean_exprs_v$mean_v > 1000 ,]
+# 
+# exprs_c_non_fetal = exprs_c[,colnames(exprs_c) %in% rownames(pData_c[pData_c$age_group != 'Fetal',])]
+# mean_exprs_c = data.frame('ID'=rownames(exprs_c_non_fetal), 'mean_c'=apply(exprs_c_non_fetal, 1, mean))
+# #mean_exprs_c = mean_exprs_c[mean_exprs_c$mean_c > 1000 ,]
+# #mean_exprs_c = mean_exprs_c[mean_exprs_c$mean_c > min(mean_exprs_v$mean_v),]
+# 
+# mean_exprs = merge(mean_exprs_c, mean_exprs_v, by='ID')
+# rownames(mean_exprs) = mean_exprs$ID
+# mean_exprs$ID = NULL
+# 
+# library(ggplot2)
+# ggplot((mean_exprs), aes(x=mean_c, y=mean_v)) + geom_point(alpha=0.25) +
+#   geom_smooth(method='lm', formula=y~x) + theme_minimal() +
+#   ggtitle('Scatter plot for preprocessed data') +
+#   theme(plot.title = element_text(hjust=0.5)) + xlab('Colantuoni\'s data') +
+#   ylab('Voineagu\'s data')
 # 
 # sorted_df = data.frame('sorted_c'=sort(mean_exprs_c$mean_c), 'sorted_v'=sort(mean_exprs_v$mean_v))
 # ggplot(log(sorted_df), aes(x=sorted_c, y=sorted_v)) + geom_point(alpha=0.5) +
