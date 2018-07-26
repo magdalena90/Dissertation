@@ -292,38 +292,51 @@ perform_tsne = function(df, labels, perplexity, title){
   return(tsne_points)  
 }
 
-identify_significant_genes = function(exprs, labels, source, fdr = 0.05){
+identify_significant_genes = function(exprs, pData, source, obj.var, fdr = 0.05){
   # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
-  #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
+  #        - pData:  pData dataframe
   # Output: data frame with statistically significant genes
   
   if(source == 'Colantuoni'){
-    obj.var = 'age_group'
-    resp.type = 'Multiclass'
-    sex_col = '`Sex:ch1`'
+    if(obj.var=='age_group'){
+      resp.type = 'Multiclass'
+      obj.var_vals = as.factor(pData[[obj.var]])
+      if(length(unique(pData$age_group)) == 10){
+        ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
+      } else {
+        ordered_levels = c('Fetal','Infant_Child','10-20','20s_50s','60s_70s') 
+      }
+      obj.var_vals = factor(obj.var_vals, ordered = TRUE, levels = ordered_levels)
+      } else {
+        resp.type = 'Quantitative'
+        obj.var_vals = pData[[obj.var]]
+      }
+    # sex_col = '`Sex:ch1`'
   } else {
-    obj.var = 'Disease.status'
     resp.type = 'Two class unpaired'
-    sex_col = 'SEX'
+    obj.var_vals = as.factor(pData[[obj.var]])
+    # sex_col = 'SEX'
   }
   
   # Perform SAM and extract significant genes
-  SAM_fit = SAM(exprs, as.factor(labels[[obj.var]]), resp.type=resp.type, 
-                geneid=rownames(exprs), random.seed=1234, logged2=TRUE, fdr.output=fdr)
+  SAM_fit = SAM(exprs, obj.var_vals, resp.type = resp.type, geneid = rownames(exprs),
+                        random.seed = 1234, logged2 = TRUE, fdr.output = fdr)
   signif_genes = data.frame(SAM_fit$siggenes.table$genes.up)
-  print(paste0(nrow(SAM_fit$siggenes.table$genes.up), ' upregulated genes'))
-  print(paste0(nrow(SAM_fit$siggenes.table$genes.do), ' downregulated genes'))
-  signif_genes = signif_genes[as.numeric(as.character(signif_genes$Fold.Change))>1.3,]
+  print(paste0(SAM_fit$siggenes.table$ngenes.up, ' upregulated genes'))
+  print(paste0(SAM_fit$siggenes.table$ngenes.do, ' downregulated genes'))
+  if('Fold.Change' %in% colnames(signif_genes)){
+    signif_genes = signif_genes[as.numeric(as.character(signif_genes$Fold.Change))>1.3,]  
+  }
   
-  # Detect significant genes for gender identification and remove them from list
-  SAM_fit_sex = SAM(exprs, as.factor(labels[[sex_col]]), resp.type=resp.type, 
-                    geneid=rownames(exprs), random.seed=1234, logged2=TRUE, fdr.output=fdr)
-  signif_genes_sex = data.frame(SAM_fit_sex$siggenes.table$genes.up)
-  print(paste0(nrow(SAM_fit_sex$siggenes.table$genes.up), ' upregulated genes for sex'))
-  print(paste0(nrow(SAM_fit_sex$siggenes.table$genes.do), ' downregulated genes for sex'))
-  signif_genes_sex = signif_genes_sex[as.numeric(as.character(signif_genes_sex$Fold.Change))>1.3,]
-  
-  signif_genes = signif_genes[!signif_genes$Gene.Name %in% signif_genes_sex$Gene.Name,]
+  # # Detect significant genes for gender identification and remove them from list
+  # SAM_fit_sex = SAM(exprs, as.factor(pData[[sex_col]]), resp.type=resp.type, 
+  #                   geneid=rownames(exprs), random.seed=1234, logged2=TRUE, fdr.output=fdr)
+  # signif_genes_sex = data.frame(SAM_fit_sex$siggenes.table$genes.up)
+  # print(paste0(nrow(SAM_fit_sex$siggenes.table$genes.up), ' upregulated genes for sex'))
+  # print(paste0(nrow(SAM_fit_sex$siggenes.table$genes.do), ' downregulated genes for sex'))
+  # signif_genes_sex = signif_genes_sex[as.numeric(as.character(signif_genes_sex$Fold.Change))>1.3,]
+  # 
+  # signif_genes = signif_genes[!signif_genes$Gene.Name %in% signif_genes_sex$Gene.Name,]
   signif_genes$Score.d. = as.numeric(as.character(signif_genes$Score.d.))
   print(paste0(nrow(signif_genes), ' statistically significant genes found'))
   
