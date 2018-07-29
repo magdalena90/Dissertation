@@ -342,5 +342,3 @@ identify_significant_genes = function(exprs, pData, source, obj.var, fdr = 0.05)
   
   return(signif_genes)
 }
-
-
