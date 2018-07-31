@@ -9,6 +9,7 @@ library(MASS)        # LDA
 library(plsgenomics) # PLS.LDA
 library(caret)
 library(samr)
+library(topGO)
 
 gg_color_hue = function(n) {
   hues = seq(15, 375, length = n + 1)
@@ -342,3 +343,37 @@ identify_significant_genes = function(exprs, pData, source, obj.var, fdr = 0.05)
   
   return(signif_genes)
 }
+
+GO_enrichment_analysis = function(genes, modules, module, ontology='BP'){
+  # Input: - genes:     vector with the ILMN IDs of all the genes
+  #        - modules:   vector of modules each gene belongs to
+  #        - module:    module on which perform the enrichment analysis
+  #        - ontology:  BP: Biological process / CC: Cellular component / MF: Molecular function
+  # Output:  data frame with top GO terms for the selected ontology and some details and statistics
+  
+  # Create topGO object
+  mod_n_genes = function (allModules) { return(allModules == 1) }
+  geneList = as.numeric(modules==module)
+  names(geneList) = genes
+  GOdata = new('topGOdata', ontology = ontology, allGenes = geneList, geneSel = mod_n_genes,
+                nodeSize = 10, annot = annFUN.db, affyLib = 'illuminaHumanv4.db')
+  
+  # Perform statistical tests
+  weight01_fisher = runTest(GOdata, statistic = 'fisher')
+  classic_fisher = runTest(GOdata, algorithm = 'classic', statistic = 'fisher')
+  elim_fisher = runTest(GOdata, algorithm = 'elim', statistic = 'fisher')
+  
+  all_res = GenTable(GOdata, classicFisher = classic_fisher, weight01Fisher = weight01_fisher,
+    elimFisher = elim_fisher, orderBy = 'elimFisher', ranksOf = 'classicFisher', topNodes = 10)
+  
+  # Plot significant genes in the GO tree
+  print(showSigOfNodes(GOdata, score(elim_fisher), firstSigNodes = 5, useInfo = 'all'))
+  
+  return(list(all_res, GOdata))
+  
+}
+
+
+
+
+

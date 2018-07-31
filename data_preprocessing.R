@@ -9,7 +9,7 @@ plot_pca = TRUE
 ######################################################################################################
 # LOAD DATA
 
-folder = 'collapsed_probes_avg'
+folder = 'collapsed_probes_max'
 
 load(paste('Data/RDatas', folder, 'LumiBatch_Colantuoni.RData', sep='/'))
 exprs_c = exprs(LumiBatch_c)

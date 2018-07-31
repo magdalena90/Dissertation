@@ -1,26 +1,26 @@
 
-setwd('~/MSc/Dissertation')
-
-library(WGCNA)
-library(lumi)
-library(xtable)
-
-folder = 'collapsed_probes_max'
-load(paste('Data/RDatas', folder, 'LumiBatch_Voineagu_preprocessed.RData', sep='/'))
-exprs = exprs(LumiBatch_v)
-pData = pData(LumiBatch_v)
-
-module_signif_test = function(MEs, obj_var, method='Welch'){
-  if(method == 'Welch'){
-    obj_var_vals = names(table(obj_var))
-    p_vals = as.numeric(apply(MEs, 2, function(x){
-      t.test(x[obj_var==obj_var_vals[1]], x[obj_var==obj_var_vals[2]], var.equal=FALSE)$p.value
-    }))
-  } else {
-    p_vals = apply(MEs, 2, function(x) cor.test(x, obj_var)$p.value)
+  setwd('~/MSc/Dissertation')
+  
+  library(WGCNA)
+  library(lumi)
+  library(xtable)
+  
+  folder = 'collapsed_probes_max'
+  load(paste('Data/RDatas', folder, 'LumiBatch_Voineagu_preprocessed.RData', sep='/'))
+  exprs = exprs(LumiBatch_v)
+  pData = pData(LumiBatch_v)
+  
+  module_signif_test = function(MEs, obj_var, method='Welch'){
+    if(method == 'Welch'){
+      obj_var_vals = names(table(obj_var))
+      p_vals = as.numeric(apply(MEs, 2, function(x){
+        t.test(x[obj_var==obj_var_vals[1]], x[obj_var==obj_var_vals[2]], var.equal=FALSE)$p.value
+      }))
+    } else {
+      p_vals = apply(MEs, 2, function(x) cor.test(x, obj_var)$p.value)
+    }
+    return(p_vals)
   }
-  return(p_vals)
-}
 
 ######################################################################################################
 ######################################################################################################
@@ -37,7 +37,7 @@ for(ds in disease_status){
   
   # !!!!! This function does not work if AnnotationDBi is loaded .......
   best_power = pickSoftThreshold(t(exprs))
-  network_ds = blockwiseModules(t(exprs_ds), power=best_power$powerEstimate, numericLabels=TRUE, 
+  network_ds = blockwiseModules(t(exprs_ds), power=best_power$powerEstimate+10, numericLabels=TRUE, 
                                 minModuleSize=40, mergeCutHeight=0.1, minCoreKME=0.7)
   
   signif_cortex_area = module_signif_test(network_ds$MEs, pData_ds$Cortex.area)
@@ -49,6 +49,7 @@ for(ds in disease_status){
   signif_ds[signif_ds>0.05/nrow(signif_ds)] = 'ns'
   
   disease_status_networks_module_significance[[ds]] = signif_ds
+  # 3 no, 4 no, 5 no, 6 si, 7 no, 8 no, 9 no, 10 si, 11 no, 12 no, 13 no
 }
 
 lapply(disease_status_networks_module_significance, function(x) xtable(x))
@@ -56,7 +57,7 @@ lapply(disease_status_networks_module_significance, function(x) xtable(x))
 ######################################################################################################
 # TOGETHER
 
-best_power = pickSoftThreshold(t(exprs))
+best_power = pickSoftThreshold(t(exprs)) # 3
 network = blockwiseModules(t(exprs), power=best_power$powerEstimate, numericLabels=TRUE, 
                            minModuleSize=40, mergeCutHeight=0.1, minCoreKME=0.7)
 
@@ -80,6 +81,19 @@ rownames(signif) = colnames(network$MEs)
 signif[signif>0.05/nrow(signif)] = 'ns'
 
 xtable(signif)
+
+# ME20, ME18, ME12
+
+# ME20:
+source('utils.R')
+mod_20_ea = GO_enrichment_analysis(rownames(exprs), network$colors, 20)
+mod_20_GenTable = data.frame(mod_20_ea[1])
+
+mod_18_ea = GO_enrichment_analysis(rownames(exprs), network$colors, 18)
+mod_18_GenTable = data.frame(mod_18_ea[1])
+
+mod_12_ea = GO_enrichment_analysis(rownames(exprs), network$colors, 12)
+mod_12_GenTable = data.frame(mod_12_ea[1])
 
 remove(LumiBatch_v, exprs, exprs_ds, network, network_ds, pData, pData_ds, signif, ds, signif_age, 
        signif_cortex_area, signif_sex, signif_pmi, signif_disease_status)
@@ -113,6 +127,6 @@ signif = data.frame('Age'=signif_age, 'Gender'=signif_sex, 'PMI'=signif_pmi)
 rownames(signif) = colnames(network$MEs)
 signif[signif>0.05/nrow(signif)] = 'ns'
 
-# Signif modules for age: ME1, ME5, ME7, ME11, ME17, ME13
+# Signif modules for age: ME2, ME5, ME5, ME14, ME10
 
 xtable(signif)
