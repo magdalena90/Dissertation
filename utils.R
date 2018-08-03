@@ -216,7 +216,8 @@ prepare_visualisation_data = function(df, labels, vis='PCA'){
   return(vis_data)
 }
 
-prepare_pca_c_vs_v = function(exprs_c, exprs_v, pData_c, pData_v, title, by='Source'){
+prepare_pca_c_vs_v=function(exprs_c, exprs_v, pData_c, pData_v, title, folder, file_name, by='Source'){
+  
   exprs_c_v = merge(exprs_c, exprs_v, by='row.names')
   rownames(exprs_c_v) = exprs_c_v$Row.names
   exprs_c_v$Row.names = NULL
@@ -227,23 +228,12 @@ prepare_pca_c_vs_v = function(exprs_c, exprs_v, pData_c, pData_v, title, by='Sou
     labels = rbind(data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group),
                    data.frame('ID' = rownames(pData_v), 'age_group' = pData_v$age_group))
   }
-  pca = perform_pca(exprs_c_v, labels, title)
+  pca = perform_pca(exprs_c_v, labels, title, folder, file_name)
   
   return(pca)
 }
 
-pcas_by_src_and_age = function(exprs_c, exprs_v, pData_c, pData_v, title, title_p1, title_p2){
-  
-  prepare_pca_c_vs_v(exprs_c, exprs_v, pData_c, pData_v, title_p1)
-  prepare_pca_c_vs_v(exprs_c, exprs_v, pData_c, pData_v, title_p2, by='age_group')
-  
-  labels_src = rbind(data.frame('ID' = rownames(pData_c), 'Source' = 'Colantuoni'),
-                     data.frame('ID' = rownames(pData_v), 'Source' = 'Voineagu'))
-  labels_age = rbind(data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group),
-                     data.frame('ID' = rownames(pData_v), 'age_group' = pData_v$age_group))
-}
-
-perform_pca = function(df, labels, title){
+perform_pca = function(df, labels, title, folder, file_name){
   # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
   #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
   # Output: pca object and plot of 2 principal components coloured by label
@@ -254,8 +244,11 @@ perform_pca = function(df, labels, title){
   # Perform pca and plot
   pca_data_vals = pca_data[,!names(pca_data) %in% colnames(labels)]
   pca = prcomp(pca_data_vals, center = TRUE, scale. = TRUE)
-  print(autoplot(pca, data = pca_data, colour = colnames(labels)[2], alpha = 0.7) + 
-        theme_minimal() + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5)))
+  pca_plot = autoplot(pca, data = pca_data, colour = colnames(labels)[2], alpha = 0.7) + 
+        theme_minimal() + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5))
+  print(pca_plot)
+  ggsave(paste0('Plots/PCA/',folder,'/',file_name,'.png'), pca_plot, width=5.54, height=3.66, 
+         units = 'in')
   
   return(pca)
 }

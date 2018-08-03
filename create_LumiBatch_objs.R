@@ -101,7 +101,7 @@ colnames(LumiBatch_v) = chipArray_to_gsm[colnames(LumiBatch_v)]
 
 # Filter probes to match to Colantuoni's genes and average probes corresponding to the same gene
 assayData = data.frame(exprs(LumiBatch_v))
-assayData = assayData[rownames(assayData) %in% heebo_ilmn_map$ILMN_ID,]
+assayData = assayData[rownames(assayData) %in% rownames(exprs(LumiBatch_c)),]
 assayData_genes = heebo_ilmn_map$Gene_Symbol[match(rownames(assayData), heebo_ilmn_map$ILMN_ID)]
 collapse_rows = collapseRows(assayData, rowGroup=assayData_genes, rowID=rownames(assayData))
 assayData = as.data.frame(collapse_rows$datETcollapsed)
@@ -115,7 +115,7 @@ exprs(LumiBatch_v) = as.matrix(assayData)
 # LumiBatch object
 pData(LumiBatch_v) = phenoData
 
-save(LumiBatch_v, file=paste0('Data/',collapse_method,'/LumiBatch_Voineagu.RData'))
+save(LumiBatch_v, file=paste0('Data/RDatas/',collapse_method,'/LumiBatch_Voineagu.RData'))
 
 
 remove(assayData, collapse_rows, gene_ilmn_map, heebo_ilmn_map, assayData_genes, 
