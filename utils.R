@@ -134,6 +134,48 @@ create_Voineagus_pData_df = function(){
   return(samples_full_data)
 }
 
+remove_faulty_probes = function(assayData, phenoData, heebo_gene_map){
+  # Input:  assayData with its phenotype data and the mapping between heebo IDs and genes
+  # Output: assayData with faulty probes removed
+  
+  # Get expression data and filter probes with repeats for their gene
+  exprs_all = assayData[,grepl('exprs', colnames(assayData))]
+  rptd_genes = names(table(heebo_gene_map$Gene_Symbol)[table(heebo_gene_map$Gene_Symbol)>1])
+  exprs = exprs_all[rownames(exprs_all) %in% 
+                      heebo_gene_map$ID[heebo_gene_map$Gene_Symbol %in% rptd_genes],]
+  
+  # Indicate if value is <1, group by age (horizontal sum)
+  exprs_ind = data.frame(matrix(0, ncol = ncol(exprs), nrow = nrow(exprs)))
+  exprs_ind[exprs <= 1] = 1
+  exprs_ind_grp = data.frame(t(aggregate(t(exprs_ind), list(phenoData$age_group), sum)))
+  colnames(exprs_ind_grp) = exprs_ind_grp[1,]
+  exprs_ind_grp = exprs_ind_grp[-1,]
+  exprs_ind_grp = data.frame(apply(exprs_ind_grp, 2, function(x) as.numeric(as.character(x))))
+  rownames(exprs_ind_grp) = rownames(exprs)
+  
+  # Group by gene (vertical sum)
+  sorted_heebo_gene_map = heebo_gene_map[match(rownames(exprs_ind_grp), heebo_gene_map$ID),]
+  exprs_ind_grp_genes = aggregate(exprs_ind_grp, list(sorted_heebo_gene_map$Gene_Symbol), sum)
+  rownames_ = exprs_ind_grp_genes[,1]
+  exprs_ind_grp_genes = exprs_ind_grp_genes[,-1]
+  exprs_ind_grp_genes = data.frame(apply(exprs_ind_grp_genes, 2, 
+                                         function(x) as.numeric(as.character(x))))
+  rownames(exprs_ind_grp_genes) = rownames_
+  max_rpt_by_gene = apply(exprs_ind_grp_genes, 1, max)
+  error_genes = rownames(exprs_ind_grp_genes)[max_rpt_by_gene==1]
+  
+  # Keep exprs of error genes, find error probes
+  candidate_error_probes = heebo_gene_map$ID[heebo_gene_map$Gene_Symbol %in% error_genes]
+  exprs_ind_grp_cep = exprs_ind_grp[rownames(exprs_ind_grp) %in% candidate_error_probes,]
+  max_rpt_by_probe = apply(exprs_ind_grp_cep, 1, max)
+  error_probes = rownames(exprs_ind_grp_cep)[max_rpt_by_probe==1]
+  
+  # Filter assayData
+  assayData = assayData[!rownames(assayData) %in% error_probes,]
+  
+  return(assayData)
+}
+
 prepare_visualisation_data = function(df, labels, vis='PCA'){
   # Input: - df:     Dataframe with probes as rows and samples as columns. Needs rownames
   #        - labels: Dataframe with columns ID and label with each row corresponding to a sample
@@ -188,6 +230,17 @@ prepare_pca_c_vs_v = function(exprs_c, exprs_v, pData_c, pData_v, title, by='Sou
   pca = perform_pca(exprs_c_v, labels, title)
   
   return(pca)
+}
+
+pcas_by_src_and_age = function(exprs_c, exprs_v, pData_c, pData_v, title, title_p1, title_p2){
+  
+  prepare_pca_c_vs_v(exprs_c, exprs_v, pData_c, pData_v, title_p1)
+  prepare_pca_c_vs_v(exprs_c, exprs_v, pData_c, pData_v, title_p2, by='age_group')
+  
+  labels_src = rbind(data.frame('ID' = rownames(pData_c), 'Source' = 'Colantuoni'),
+                     data.frame('ID' = rownames(pData_v), 'Source' = 'Voineagu'))
+  labels_age = rbind(data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group),
+                     data.frame('ID' = rownames(pData_v), 'age_group' = pData_v$age_group))
 }
 
 perform_pca = function(df, labels, title){
