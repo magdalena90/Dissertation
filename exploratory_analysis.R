@@ -5,8 +5,8 @@ library(GEOquery)
 library(ggplot2)
 library(gridExtra)
 library(ggpubr)
-library(wesanderson)
 library(varhandle)
+library(dplyr)
 
 ######################################################################################################
 ######################################################################################################
@@ -77,6 +77,7 @@ remove(exprs_c_non_fetal, exprs_v_ctrl, common_age_groups, age_group_colours, c,
 conf_vars = data.frame('age'=pData_c$`age:ch1`, 'pmi'=pData_c$`postmortem interval (pmi):ch1`,
                        'gender'=pData_c$`Sex:ch1`,'RIN'=pData_c$`rna integrity number (rin):ch1`,
                        'age_group'=pData_c$age_group)
+conf_vars$age = unfactor(conf_vars$age)
 ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
 conf_vars = transform(conf_vars, age_group=factor(age_group, levels = ordered_levels))
 
@@ -87,10 +88,6 @@ age_to_weeks <- function(age){
 }
 
 # Age counts
-conf_vars$age = unfactor(conf_vars$age)
-ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
-conf_vars = transform(conf_vars, age_group=factor(age_group, levels = ordered_levels))
-
 age_hist = ggplot(data=conf_vars, aes(x=ceiling(age-1), fill=age_group)) +
   geom_histogram(stat='count') + guides(fill=FALSE) + xlab('Age') + theme_minimal() +
   ggtitle("Sample's age distribution") + theme(plot.title = element_text(hjust = 0.5))
@@ -103,8 +100,9 @@ infant_hist = ggplot(data=conf_vars[conf_vars$age_group=='Infant',], aes(x=ceili
   geom_histogram(stat='count', fill=gg_color_hue(10)[2]) + guides(fill=FALSE) + 
   xlab('Infant age (yrs)') + theme_minimal()# + coord_fixed(ratio=0.05)
 
-group_age_hist = ggplot(data=conf_vars, aes(x=age_group, fill=age_group)) + 
-  geom_histogram(stat='count') + guides(fill=FALSE) + xlab('Age Groups') + theme_minimal()
+group_age_hist = ggplot(data=conf_vars, aes(x=age_group, fill=age_group)) + geom_bar(stat='count') + 
+  geom_text(stat='count', aes(label=..count..), color='white', vjust=1.2) + guides(fill=FALSE) + 
+  xlab('Age Groups') + theme_minimal()
 
 ggarrange(age_hist + annotation_custom(grob=ggplotGrob(fetal_hist),xmin=30,xmax=55,ymin=15,ymax=35) +
   annotation_custom(grob=ggplotGrob(infant_hist), xmin=60, xmax=Inf, ymin=15, ymax=35), group_age_hist,
@@ -124,7 +122,7 @@ ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s
 exprs_c_grouped = transform(exprs_c_grouped, age_group=factor(age_group, levels = ordered_levels))
 
 ggplot(exprs_c_grouped, aes(x=age_group, y=expression, fill=age_group)) + geom_boxplot() +
-  xlab('Age Group') + ylab('Expression levels') + theme_minimal() + ggtitle('Expression Levels by Age') +
+  xlab('Age Group') + ylab('Expression levels') + theme_minimal() + ggtitle('Expression Levels by Age')+
   theme(legend.position='none', plot.title = element_text(hjust = 0.5))
 
 remove(exprs_c_grouped, ordered_levels)
@@ -132,16 +130,21 @@ remove(exprs_c_grouped, ordered_levels)
 # Confounding variables
 pmi = ggplot(conf_vars, aes(x=age_group, y=unfactor(pmi), fill=age_group)) + geom_boxplot() +
   ggtitle('PMI distribution by Age Group') + theme_minimal() + ylab('Post Mortem Interval') +
-  theme(plot.title = element_text(hjust = 0.5), legend.position='none') + xlab('')
+  theme(plot.title = element_text(hjust = 0.5), legend.position='none', axis.title.x=element_blank())
 
-gender = ggplot(conf_vars, aes(x=age_group, fill=gender)) + xlab('Age Group') + ylab('percentage') + 
-  geom_histogram(stat='count', position='fill') + scale_fill_manual(values=c('#ff8080', '#56B4E9')) + 
-  ggtitle('Gender distribution by Age') + theme_minimal() + theme(plot.title = element_text(hjust=.5),
-                                                                  legend.position='bottom')
+gender_df = conf_vars[,c('age_group','gender')]
+gender_df = gender_df %>% group_by(age_group, gender) %>% summarize(n = n()) %>% 
+  mutate(freq = n/sum(n)) %>% mutate(perc = paste0(round((100*freq)),'%'))
+
+gender = ggplot(gender_df, aes(x=age_group, y=freq, fill=gender)) +  ylab('percentage') + 
+  geom_bar(stat='identity') + scale_fill_manual(values=c('#ff8080', '#56B4E9')) +
+  geom_text(aes(label = perc, y=freq), position = 'stack', color = 'white', vjust = 1.5) +
+  ggtitle('Gender distribution by Age Group') + theme_minimal() + theme(plot.title = 
+    element_text(hjust=.5), legend.position='bottom', axis.title.x=element_blank())
 
 grid.arrange(pmi, gender, nrow=2, heights=c(5,4))
 
-remove(pmi, gender)
+remove(pmi, gender, conf_vars, ordered_levels)
 ######################################################################################################
 ######################################################################################################
 # VOINEAGU PAPER
@@ -155,23 +158,35 @@ conf_vars = transform(conf_vars, age_group = factor(age_group, levels = ordered_
 # Counts by age group
 group_age = ggplot(data=conf_vars, aes(x=age_group, fill=age_group)) + guides(fill=FALSE) + 
   geom_histogram(stat='count') + scale_fill_manual(values=gg_color_hue(10)[3:8]) + 
-  xlab('') + theme_minimal() + theme(plot.title = element_text(hjust=.5), legend.position='bottom',
-  axis.title.x=element_blank()) + ggtitle('Sample by Age')
+  geom_text(stat='count', aes(label=..count..), color='white', vjust=1.5) + theme_minimal() + 
+  theme(plot.title = element_text(hjust=.5), legend.position='bottom', axis.title.x=element_blank()) + 
+  ggtitle('Sample by Age')
 
-brain_region = ggplot(conf_vars, aes(x=age_group, fill=brain_region)) + xlab('') + 
-  ylab('percentage') + geom_histogram(stat='count', position='fill') + theme_minimal() + 
+brain_region_df = conf_vars[,c('age_group','brain_region')]
+brain_region_df = brain_region_df %>% group_by(age_group, brain_region) %>% summarize(n = n()) %>% 
+  mutate(freq = n/sum(n)) %>% mutate(perc = paste0(round((100*freq)),'%'))
+
+brain_region = ggplot(brain_region_df, aes(x=age_group, y=freq, fill=brain_region)) + 
+  ylab('percentage') + geom_bar(stat='identity') + theme_minimal() + 
+  geom_text(aes(label = perc, y=freq), position = 'stack', color = 'white', vjust = 1.2) +
   scale_fill_manual(values=c('#7324A6', '#f43e6c', '#FFDB00')) + theme(plot.title = element_text(
     hjust=.5), legend.position='bottom', axis.title.x=element_blank()) + 
   ggtitle('Brain region distribution by Age')
 
-disease_status = ggplot(conf_vars, aes(x=age_group, fill=disease_status)) + xlab('Age Group') + 
-  ylab('percentage') + geom_histogram(stat='count', position='fill') + theme_minimal() + 
-  scale_fill_manual(values=c('#009999','#99cc00')) + theme(plot.title = element_text(
-    hjust=.5), legend.position='bottom') + ggtitle('Disease Status distribution by Age')
+disease_status_df = conf_vars[,c('age_group','disease_status')]
+disease_status_df = disease_status_df %>% group_by(age_group, disease_status) %>% summarize(n=n()) %>% 
+  mutate(freq = n/sum(n)) %>% mutate(perc = paste0(round((100*freq)),'%'))
 
-grid.arrange(group_age, brain_region, disease_status, nrow=3, heights=c(3,4,4.5))
+disease_status = ggplot(disease_status_df, aes(x=age_group, y=freq, fill=disease_status)) + 
+  ylab('percentage') + geom_histogram(stat='identity') + theme_minimal() + 
+  geom_text(aes(label = perc, y=freq), position = 'stack', color = 'white', vjust = 1.2) +
+  scale_fill_manual(values=c('#009999','#99cc00')) + theme(plot.title = element_text(hjust=.5), 
+    legend.position='bottom', axis.title.x=element_blank()) + 
+  ggtitle('Disease Status distribution by Age')
 
-remove(group_age, brain_region, disease_status)
+grid.arrange(group_age, brain_region, disease_status, nrow=3, heights=c(3,4,4))
+
+remove(group_age, brain_region, disease_status, brain_region_df, disease_status_df)
 
 # Boxplots of Expression by Age Group
 exprs_v_grouped = data.frame(t(aggregate(t(exprs_v), list(pData_v$age_group), mean)))
@@ -185,8 +200,9 @@ ordered_levels = c('Child','10-20','20s','30s','40s','50s')
 exprs_v_grouped = transform(exprs_v_grouped, age_group=factor(age_group, levels = ordered_levels))
 
 ggplot(exprs_v_grouped, aes(x=age_group, y=expression, fill=age_group)) + geom_boxplot() +
-  xlab('Age Group') + ylab('Expression levels') + theme_minimal() + ggtitle('Expression Levels by Age')+
-  theme(legend.position='none', plot.title = element_text(hjust = 0.5))
+  xlab('Age Group') + ylab('Expression levels') + theme_minimal() +
+  theme(legend.position='none', plot.title = element_text(hjust = 0.5)) + 
+  scale_fill_manual(values=gg_color_hue(10)[3:8]) + ggtitle('Expression Levels by Age')
 
 remove(exprs_v_grouped, ordered_levels)
 
@@ -195,17 +211,22 @@ pmi_data = conf_vars[conf_vars$pmi != 'na',]
 pmi_data$pmi = as.numeric(gsub(',', '', pmi_data$pmi))
 pmi = ggplot(pmi_data, aes(x=age_group, y=pmi, fill=age_group)) + geom_boxplot() +
   ggtitle('PMI distribution by Age Group') + theme_minimal() + ylab('Post Mortem Interval') +
-  theme(plot.title = element_text(hjust = 0.5), legend.position='none') + xlab('') + 
+  theme(plot.title = element_text(hjust = 0.5), legend.position='none', axis.title.x=element_blank()) +
   scale_fill_manual(values=gg_color_hue(10)[3:8])
 
-gender = ggplot(conf_vars, aes(x=age_group, fill=gender)) + xlab('Age Group') + 
-  ylab('percentage') + geom_histogram(stat='count', position='fill') + 
-  scale_fill_manual(values=c('#ff8080', '#56B4E9')) + ggtitle('Gender distribution by Age') + 
-  theme_minimal() + theme(plot.title = element_text(hjust=.5), legend.position='bottom')
+gender_df = conf_vars[,c('age_group','gender')]
+gender_df = gender_df %>% group_by(age_group, gender) %>% summarize(n = n()) %>% 
+  mutate(freq = n/sum(n)) %>% mutate(perc = paste0(round((100*freq)),'%'))
 
-grid.arrange(pmi, gender, nrow=2, heights=c(5,4))
+gender = ggplot(gender_df, aes(x=age_group, y=freq, fill=gender)) +  ylab('percentage') + 
+  geom_bar(stat='identity') + scale_fill_manual(values=c('#ff8080', '#56B4E9')) +
+  geom_text(aes(label = perc, y=freq), position = 'stack', color = 'white', vjust = 1.2) +
+  ggtitle('Gender distribution by Age Group') + theme_minimal() + theme(plot.title = 
+    element_text(hjust=.5), legend.position='bottom', axis.title.x=element_blank())
 
-remove(pmi_data, pmi, gender)
+grid.arrange(pmi, gender, nrow=2, heights=c(6,5))
+
+remove(pmi_data, gender_df, pmi, gender)
 
 # Counts by Brain region and Disease status
 ggplot(data=conf_vars, aes(x=brain_region, fill=disease_status)) +
