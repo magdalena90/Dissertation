@@ -251,3 +251,47 @@ ggplot(data=conf_vars, aes(x=brain_region, fill=disease_status)) +
     color='white') + scale_fill_manual(values=c('#009999','#99cc00')) +
   ggtitle('Sample\'s distribution by Disease Status and Brain Region') + 
   theme(plot.title = element_text(hjust = 0.5))
+
+######################################################################################################
+######################################################################################################
+# VISUALISATIONS USING DIMENSIONALITY REDUCTION TECHNIQUES
+
+pData = data.frame('ID' = rownames(pData_c), 'age_group' = pData_c$age_group)
+
+# By Age Group
+pca = perform_pca(exprs_c, pData, 'PCA plot',1,1)
+mds = perform_mds(exprs_c, pData, 'MDS plot')
+lda = perform_lda(exprs_c, pData, 'LDA plot')
+pls_lda = perform_lda(exprs_c, pData, 'PLS.LDA plot', pls = TRUE)
+#tsne = perform_tsne(exprs_c, pData, 'TSNE plot') # Run in terminal, it dies on RStudio!
+
+# Load tsne output ran on terminal and plot
+tsne = read.csv('~/MSc/Dissertation/tsne_50.csv')
+ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
+tsne = transform(tsne, age_group=factor(age_group, levels = ordered_levels))
+
+ggplot(tsne, aes(x=x, y=y, colour=age_group)) + geom_point() + ggtitle('TSNE with perplexity=50') +
+  theme(plot.title = element_text(hjust = 0.5), axis.title.x=element_blank(),
+        axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.title.y=element_blank(),
+        axis.text.y=element_blank(), axis.ticks.y=element_blank()) + theme_minimal()
+
+# By Disease Status
+folder = 'max_var_btwn'
+pData = data.frame('ID' = rownames(pData_v), 'disease_status' = pData_v$DISORDER)
+pData$disease_status = unfactor(pData$disease_status)
+pData$disease_status[pData$disease_status=='Autism'] = 'autism'
+pData$disease_status[pData$disease_status=='No Known Disorder'] = 'control'
+pData$disease_status[pData$disease_status=='Autism,Chromosome 15q Duplication'] = 'autism (ch 15q dup)'
+
+pca = perform_pca(exprs_v, pData, 'PCA plot', 'DiseaseStatus', folder)
+mds = perform_mds(exprs_v, pData, 'MDS plot', 'DiseaseStatus', folder)
+lda = perform_lda(exprs_v, pData, 'LDA plot', 'DiseaseStatus', folder)
+pls_lda = perform_lda(exprs_v, pData, 'PLS.LDA plot', 'DiseaseStatus', folder, pls = TRUE)
+
+# By Brain Region
+pData = data.frame('ID' = rownames(pData_v), 'brain_region' = pData_v$Cortex.area)
+pca = perform_pca(exprs_v, pData, 'PCA plot', 'CortexArea', folder)
+mds = perform_mds(exprs_v, pData, 'MDS plot', 'CortexArea', folder)
+lda = perform_lda(exprs_v, pData, 'LDA plot', 'CortexArea', folder)
+pls_lda = perform_lda(exprs_v, pData, 'PLS.LDA plot', 'CortexArea', folder, pls = TRUE)
+

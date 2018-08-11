@@ -294,47 +294,39 @@ save(LumiBatch_v, file=paste0('Data/RDatas/',folder,'/LumiBatch_Voineagu_preproc
 ######################################################################################################
 ######################################################################################################
 ######################################################################################################
-# PROCESS TEMPORAL AND FRONTAL SAMPLES SEPARATELY
+# PROCESS TEMPORAL AND FRONTAL SAMPLES SEPARATELY FROM CEREBELLUM
 
 # Filter probes and samples as in preprocessing of full data:
-folder = 'max_var'
-load(paste('Data/RDatas', folder, 'LumiBatch_Colantuoni_preprocessed.RData', sep='/'))
-exprs_c = exprs(LumiBatch_c)
+folder = 'max_var_between'
 load(paste('Data/RDatas', folder, 'LumiBatch_Voineagu_preprocessed.RData', sep='/'))
+exprs_v = exprs(LumiBatch_v)
 pData_v = pData(LumiBatch_v)
 load(paste('Data/RDatas', folder, 'LumiBatch_Voineagu.RData', sep='/'))
-LumiBatch_v = LumiBatch_v[rownames(exprs(LumiBatch_v)) %in% rownames(exprs_c),
+LumiBatch_v = LumiBatch_v[rownames(exprs(LumiBatch_v)) %in% rownames(exprs_v),
                           colnames(exprs(LumiBatch_v)) %in% rownames(pData_v)]
 pData(LumiBatch_v) = pData(LumiBatch_v)[rownames(pData(LumiBatch_v)) %in% rownames(pData_v),]
 exprs_v = exprs(LumiBatch_v)
 pData_v = pData(LumiBatch_v)
 
-cortex_areas = c('frontal','temporal')
 
-for(cortex_area in cortex_areas){
-  LumiBatch = LumiBatch_v[,colnames(exprs_v) %in% rownames(pData_v)[pData_v$Cortex.area==cortex_area]]
-  exprs = exprs(LumiBatch)
-  pData = pData(LumiBatch)
-  
-  # Transform Signal to Ratio
-  row_mean = apply(exprs, 1, mean)
-  ratio = (exprs+1)/(row_mean+1)
-  exprs(LumiBatch) = as.matrix(ratio[,colnames(ratio) %in% colnames(exprs)])
-  
-  # Variance Stabilisation
-  LumiBatch = lumiT(LumiBatch, method = 'log2', ifPlot = TRUE)
-  
-  # Normalisation
-  LumiBatch = lumiN(LumiBatch, method='rsn')
+LumiBatch = LumiBatch_v[,colnames(exprs_v) %in% rownames(pData_v)[pData_v$Cortex.area!='cerebellum']]
+exprs = exprs(LumiBatch)
+pData = pData(LumiBatch)
 
-  if(cortex_area=='frontal'){
-    LumiBatch_f = LumiBatch
-    save(LumiBatch_f, file=paste0('Data/RDatas/',folder,'/LumiBatch_Voineagu_preprocessed_f.RData'))
-  } else {
-    LumiBatch_t = LumiBatch
-    save(LumiBatch_t, file=paste0('Data/RDatas/',folder,'/LumiBatch_Voineagu_preprocessed_t.RData'))
-  } 
-}
+# Transform Signal to Ratio
+row_mean = apply(exprs, 1, mean)
+ratio = (exprs+1)/(row_mean+1)
+exprs(LumiBatch) = as.matrix(ratio[,colnames(ratio) %in% colnames(exprs)])
 
-remove(exprs_exprs_c, exprs_v, LumiBatch, LumiBatch_c, LumiBatch_v, LumiBatch_t, LumiBatch_f, pData,
-       pData_c, pData_v, phenoData, cortex_area, cortex_areas, row_mean)
+# Variance Stabilisation
+LumiBatch = lumiT(LumiBatch, method = 'log2', ifPlot = TRUE)
+
+# Normalisation
+LumiBatch = lumiN(LumiBatch, method='rsn')
+
+LumiBatch_ft = LumiBatch
+save(LumiBatch_ft, file=paste0('Data/RDatas/',folder,'/LumiBatch_Voineagu_preprocessed_ft.RData'))
+
+
+remove(exprs_exprs_c, exprs_v, LumiBatch, LumiBatch_c, LumiBatch_v, LumiBatch_ft, pData, pData_c, 
+       pData_v, phenoData, row_mean)

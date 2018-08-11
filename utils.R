@@ -188,7 +188,7 @@ prepare_visualisation_data = function(df, labels, vis='PCA'){
   
   # Visualisation specific transformations
   if(vis=='MDS'){
-    pearson_cor = cor(exprs_c, method = 'pearson')
+    pearson_cor = cor(df, method = 'pearson')
     distance_mat = 1 - pearson_cor
     rownames(distance_mat) = colnames(distance_mat)
     mds = cmdscale(distance_mat, k = 2, eig = TRUE)
@@ -245,10 +245,13 @@ perform_pca = function(df, labels, title, folder, file_name){
   pca_data_vals = pca_data[,!names(pca_data) %in% colnames(labels)]
   pca = prcomp(pca_data_vals, center = TRUE, scale. = TRUE)
   pca_plot = autoplot(pca, data = pca_data, colour = colnames(labels)[2], alpha = 0.7) + 
-        theme_minimal() + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5))
+    theme_minimal() + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5), 
+                                             legend.position='bottom') #+
+    #scale_color_manual(values=c('#7324A6','#f43e6c','#FFDB00')) # Brain region
+    #scale_color_manual(values=c('#009999','#006666','#99cc00')) # Autism
   print(pca_plot)
-  ggsave(paste0('Plots/PCA/',folder,'/',file_name,'.png'), pca_plot, width=5.54, height=3.66, 
-         units = 'in')
+  ggsave(paste0('Plots/PCA/',folder,'/',file_name,'.png'), pca_plot, width=5.54, height=3.66,
+        units = 'in')
   
   return(pca)
 }
@@ -262,9 +265,10 @@ perform_mds = function(df, labels, title){
   mds_data = prepare_visualisation_data(df, labels, vis = 'MDS')
 
   # Plot MDS
-  print(ggplot(mds_data, aes(x=X1, y=X2, colour=get(colnames(labels)[2]))) + geom_point() + 
-        theme_minimal() + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5)) +
-        labs(colour = colnames(labels)[2]))
+  mds_plot = ggplot(mds_data, aes(x=X1, y=X2, colour=get(colnames(labels)[2]))) + theme_minimal() + 
+    geom_point(alpha = 0.7) + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5), 
+    legend.position='bottom') + labs(colour = colnames(labels)[2])
+  print(mds_plot) 
   
   return(mds_data)
 }
@@ -283,10 +287,10 @@ perform_lda = function(df, labels, title, pls=FALSE){
     lda_fit = pls_fit$lda.out
     lda_points = as.matrix(lda_data[,-ncol(lda_data)]) %*% pls_fit$pls.out$R %*% lda_fit$scaling
   } else {
-    lda_fit = lda(age_group ~ ., data = lda_data)
-    lda_points = as.matrix(lda_data[,-ncol(lda_data)]) %*% lda_fit$scaling 
+    lda_fit = lda(x=lda_data[,-ncol(lda_data)], grouping = lda_data[,ncol(lda_data)])
+    lda_points = as.matrix(lda_data[,-ncol(lda_data)]) %*% lda_fit$scaling
   }
-  lda_points = data.frame(cbind(lda_points[,1:2], as.character(pData$age_group)))
+  lda_points = data.frame(cbind(lda_points[,1:2], as.character(lda_data[,ncol(lda_data)])))
   colnames(lda_points) = c('LD1','LD2',colnames(labels)[2])
   
   if(colnames(labels[2])=='age_group'){
@@ -298,11 +302,12 @@ perform_lda = function(df, labels, title, pls=FALSE){
   xlab = paste0('LD1 (', round(100*lda_fit$svd[1]^2/sum(lda_fit$svd^2),1),'%)') # between group var
   ylab = paste0('LD2 (', round(100*lda_fit$svd[2]^2/sum(lda_fit$svd^2),1),'%)')
   
-  print(ggplot(lda_points, aes(x=LD1, y=LD2, colour=get(colnames(labels)[2]))) + geom_point() + 
-          ggtitle(title) + labs(colour = colnames(labels)[2]) + xlab(xlab) + ylab(ylab) +
-          theme(plot.title = element_text(hjust = 0.5), axis.text.x=element_blank(), 
-                axis.ticks.x=element_blank(), axis.text.y=element_blank(), 
-                axis.ticks.y=element_blank()))
+  lda_plot = ggplot(lda_points, aes(x=LD1, y=LD2, colour=get(colnames(labels)[2]))) + geom_point() + 
+    ggtitle(title) + labs(colour = colnames(labels)[2]) + xlab(xlab) + ylab(ylab) +
+    theme(plot.title = element_text(hjust = 0.5), axis.text.x=element_blank(), 
+          legend.position='bottom',
+          axis.ticks.x=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank())
+  print(lda_plot)
   
   return(lda_fit)
 }
@@ -330,12 +335,13 @@ perform_tsne = function(df, labels, perplexity, title){
     tsne_points = transform(tsne_points, age_group=factor(age_group, levels = ordered_levels))
   }
   
-  print(ggplot(tsne_points, aes(x=x, y=y, colour=get(colnames(labels)[2]))) + geom_point() + 
-          ggtitle(title) +  labs(colour = colnames(labels)[2]) +
-          theme(plot.title = element_text(hjust = 0.5), axis.title.x=element_blank(),
-                axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.title.y=element_blank(),
-                axis.text.y=element_blank(), axis.ticks.y=element_blank()) + theme_minimal())
-  
+  tsne_plot = ggplot(tsne_points, aes(x=x, y=y, colour=get(colnames(labels)[2]))) + geom_point() + 
+    ggtitle(title) + labs(colour = colnames(labels)[2]) + theme(plot.title = element_text(hjust=0.5),
+      axis.title.x=element_blank(),axis.text.x=element_blank(), axis.ticks.x=element_blank(), 
+      axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank()) + 
+    theme_minimal()
+  print(tsne_plot)
+
   return(tsne_points)  
 }
 
@@ -351,18 +357,17 @@ identify_significant_genes = function(exprs, pData, source, obj.var, fdr = 0.05)
       if(length(unique(pData$age_group)) == 10){
         ordered_levels = c('Fetal','Infant','Child','10-20','20s','30s','40s','50s','60s','70s')
       } else {
-        ordered_levels = c('Fetal','Infant_Child','10-20','20s_50s','60s_70s') 
+        #ordered_levels = c('Fetal','Infant_Child','10-20','20s_50s','60s_70s')
+        ordered_levels = c('Fetal','Infant_Child','10-20','20s_30s','40s_50s','60s_70s') 
       }
       obj.var_vals = factor(obj.var_vals, ordered = TRUE, levels = ordered_levels)
       } else {
         resp.type = 'Quantitative'
         obj.var_vals = pData[[obj.var]]
       }
-    # sex_col = '`Sex:ch1`'
   } else {
     resp.type = 'Two class unpaired'
     obj.var_vals = as.factor(pData[[obj.var]])
-    # sex_col = 'SEX'
   }
   
   # Perform SAM and extract significant genes
@@ -375,15 +380,6 @@ identify_significant_genes = function(exprs, pData, source, obj.var, fdr = 0.05)
     signif_genes = signif_genes[as.numeric(as.character(signif_genes$Fold.Change))>1.3,]  
   }
   
-  # # Detect significant genes for gender identification and remove them from list
-  # SAM_fit_sex = SAM(exprs, as.factor(pData[[sex_col]]), resp.type=resp.type, 
-  #                   geneid=rownames(exprs), random.seed=1234, logged2=TRUE, fdr.output=fdr)
-  # signif_genes_sex = data.frame(SAM_fit_sex$siggenes.table$genes.up)
-  # print(paste0(nrow(SAM_fit_sex$siggenes.table$genes.up), ' upregulated genes for sex'))
-  # print(paste0(nrow(SAM_fit_sex$siggenes.table$genes.do), ' downregulated genes for sex'))
-  # signif_genes_sex = signif_genes_sex[as.numeric(as.character(signif_genes_sex$Fold.Change))>1.3,]
-  # 
-  # signif_genes = signif_genes[!signif_genes$Gene.Name %in% signif_genes_sex$Gene.Name,]
   signif_genes$Score.d. = as.numeric(as.character(signif_genes$Score.d.))
   print(paste0(nrow(signif_genes), ' statistically significant genes found'))
   
@@ -418,8 +414,3 @@ GO_enrichment_analysis = function(genes, modules, module, ontology='BP'){
   return(list(all_res, GOdata))
   
 }
-
-
-
-
-
